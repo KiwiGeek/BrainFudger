@@ -14,23 +14,23 @@
 ## Usage
 
 ```powershell
-dotnet run -- hello.bf -o hello.exe
+dotnet run -- .\bf_source\hello.bf -o hello.exe
 ```
 
 ```powershell
-dotnet run -- hello.bf -o hello.exe --target win32-x64
+dotnet run -- .\bf_source\hello.bf -o hello.exe --target win32-x64
 ```
 
 ```powershell
-dotnet run -- hello.bf -o hello-x86.exe --target win32-x86
+dotnet run -- .\bf_source\hello.bf -o hello-x86.exe --target win32-x86
 ```
 
 ```powershell
-dotnet run -- hello.bf --run
+dotnet run -- .\bf_source\hello.bf --run
 ```
 
 ```powershell
-dotnet run -- advanced-test.bf --run --quiet-run
+dotnet run -- .\bf_source\advanced-test.bf --run --quiet-run
 ```
 
 ```powershell
