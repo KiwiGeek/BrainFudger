@@ -1,7 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using BrainFucker.Models;
 
-namespace BrainFucker;
+namespace BrainFucker.Emitters;
 
 internal sealed class MsDosComEmitter : IBinaryEmitter
 {
@@ -25,7 +26,7 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        var program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
+        DosProgramImage program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
         return DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, ComOrigin);
     }
 }
@@ -52,8 +53,8 @@ internal sealed class MsDosExeEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        var program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
-        var imageBytes = DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
+        DosProgramImage program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
+        byte[] imageBytes = DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
         return DosMzExecutableWriter.WriteExecutable(imageBytes, StackSize);
     }
 }
@@ -62,39 +63,39 @@ internal static class DosBrainfuckEmitter
 {
     public static DosProgramImage EmitProgramImage(string sanitizedSource, CompilerOptions options)
     {
-        var assembler = new DosAssembler();
+        DosAssembler assembler = new();
         EmitPrologue(assembler);
         EmitProgram(assembler, sanitizedSource);
         EmitExit(assembler, 0);
         EmitErrorPath(assembler, "error_before", "pointer_before_message", 1);
         EmitErrorPath(assembler, "error_past", "pointer_past_message", 1);
 
-        var codeImage = assembler.ToImage();
-        var dataImage = BuildDataImage(options);
+        DosCodeImage codeImage = assembler.ToImage();
+        DosDataImage dataImage = BuildDataImage(options);
         return new DosProgramImage(codeImage, dataImage);
     }
 
     public static byte[] PatchAndFlatten(DosCodeImage codeImage, DosDataImage dataImage, ushort origin)
     {
-        var output = new byte[codeImage.Content.Length + dataImage.Content.Length];
+        byte[] output = new byte[codeImage.Content.Length + dataImage.Content.Length];
         Array.Copy(codeImage.Content, output, codeImage.Content.Length);
         Array.Copy(dataImage.Content, 0, output, codeImage.Content.Length, dataImage.Content.Length);
 
-        foreach (var patch in codeImage.Patches)
+        foreach (DosTextPatch patch in codeImage.Patches)
         {
-            if (!TryResolveTargetOffset(codeImage, dataImage, patch.LabelName, out var targetOffset))
+            if (!TryResolveTargetOffset(codeImage, dataImage, patch.LabelName, out int targetOffset))
             {
                 throw new InvalidOperationException($"Unknown patch target '{patch.LabelName}'.");
             }
 
             if (patch.Kind == DosPatchKind.Absolute16)
             {
-                var absoluteOffset = (ushort)(origin + targetOffset);
+                ushort absoluteOffset = (ushort)(origin + targetOffset);
                 Array.Copy(BitConverter.GetBytes(absoluteOffset), 0, output, patch.PatchOffset, 2);
             }
             else
             {
-                var displacement = unchecked((short)(targetOffset - patch.NextInstructionOffset));
+                short displacement = unchecked((short)(targetOffset - patch.NextInstructionOffset));
                 Array.Copy(BitConverter.GetBytes(displacement), 0, output, patch.PatchOffset, 2);
             }
         }
@@ -104,8 +105,8 @@ internal static class DosBrainfuckEmitter
 
     private static DosDataImage BuildDataImage(CompilerOptions options)
     {
-        var bytes = new List<byte>();
-        var labels = new Dictionary<string, int>(StringComparer.Ordinal);
+        List<byte> bytes = new();
+        Dictionary<string, int> labels = new(StringComparer.Ordinal);
 
         static void DefineLabel(Dictionary<string, int> labels, string name, int offset) => labels[name] = offset;
 
@@ -133,7 +134,7 @@ internal static class DosBrainfuckEmitter
             return true;
         }
 
-        if (dataImage.Labels.TryGetValue(labelName, out var dataOffset))
+        if (dataImage.Labels.TryGetValue(labelName, out int dataOffset))
         {
             targetOffset = codeImage.Content.Length + dataOffset;
             return true;
@@ -157,17 +158,17 @@ internal static class DosBrainfuckEmitter
 
     private static void EmitProgram(DosAssembler assembler, string sanitized)
     {
-        var loopStack = new Stack<(string StartLabel, string EndLabel)>();
-        var loopCounter = 0;
-        var inputCounter = 0;
+        Stack<(string StartLabel, string EndLabel)> loopStack = new();
+        int loopCounter = 0;
+        int inputCounter = 0;
 
-        for (var i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < sanitized.Length; i++)
         {
-            var token = sanitized[i];
+            char token = sanitized[i];
 
             if (token is '+' or '-' or '>' or '<')
             {
-                var count = CountRepeatedTokens(sanitized, i, token);
+                int count = CountRepeatedTokens(sanitized, i, token);
                 EmitCompressedOperation(assembler, token, count);
                 i += count - 1;
                 continue;
@@ -185,8 +186,8 @@ internal static class DosBrainfuckEmitter
                     break;
 
                 case '[':
-                    var startLabel = $"loop_start_{loopCounter}";
-                    var endLabel = $"loop_end_{loopCounter}";
+                    string startLabel = $"loop_start_{loopCounter}";
+                    string endLabel = $"loop_end_{loopCounter}";
                     loopCounter++;
                     assembler.Label(startLabel);
                     assembler.CmpBytePtrBxImmediate(0);
@@ -195,7 +196,7 @@ internal static class DosBrainfuckEmitter
                     break;
 
                 case ']':
-                    var loop = loopStack.Pop();
+                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
                     assembler.CmpBytePtrBxImmediate(0);
                     assembler.JumpNotEqual(loop.StartLabel);
                     assembler.Label(loop.EndLabel);
@@ -241,8 +242,8 @@ internal static class DosBrainfuckEmitter
 
     private static void EmitReadByte(DosAssembler assembler, int inputIndex)
     {
-        var zeroLabel = $"input_zero_{inputIndex}";
-        var doneLabel = $"input_done_{inputIndex}";
+        string zeroLabel = $"input_zero_{inputIndex}";
+        string doneLabel = $"input_done_{inputIndex}";
 
         assembler.PushReg(DosRegister.Bx);
         assembler.MovRegReg(DosRegister.Dx, DosRegister.Bx);
@@ -277,7 +278,7 @@ internal static class DosBrainfuckEmitter
 
     private static int CountRepeatedTokens(string source, int start, char token)
     {
-        var count = 0;
+        int count = 0;
         while (start + count < source.Length && source[start + count] == token)
         {
             count++;
@@ -293,30 +294,30 @@ internal static class DosMzExecutableWriter
 
     public static byte[] WriteExecutable(byte[] imageBytes, int stackSize)
     {
-        var imageWithStack = new byte[imageBytes.Length + stackSize];
+        byte[] imageWithStack = new byte[imageBytes.Length + stackSize];
         Array.Copy(imageBytes, imageWithStack, imageBytes.Length);
 
-        var headerSizeBytes = HeaderParagraphs * 16;
-        var fileSize = headerSizeBytes + imageWithStack.Length;
-        var blocksInFile = (ushort)((fileSize + 511) / 512);
-        var bytesInLastBlock = (ushort)(fileSize % 512);
+        int headerSizeBytes = HeaderParagraphs * 16;
+        int fileSize = headerSizeBytes + imageWithStack.Length;
+        ushort blocksInFile = (ushort)((fileSize + 511) / 512);
+        ushort bytesInLastBlock = (ushort)(fileSize % 512);
         if (bytesInLastBlock == 0)
         {
             bytesInLastBlock = 512;
         }
 
-        var totalImageSize = imageWithStack.Length;
+        int totalImageSize = imageWithStack.Length;
         if (totalImageSize > 0xFFF0)
         {
             throw new InvalidOperationException("The msdos-exe target currently supports only single-segment images under 64 KB.");
         }
 
-        var minAllocParagraphs = 0;
-        var maxAllocParagraphs = 0xFFFF;
-        var initialSp = (ushort)totalImageSize;
+        int minAllocParagraphs = 0;
+        int maxAllocParagraphs = 0xFFFF;
+        ushort initialSp = (ushort)totalImageSize;
 
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
+        using MemoryStream stream = new();
+        using BinaryWriter writer = new(stream, Encoding.ASCII, leaveOpen: true);
 
         writer.Write((ushort)0x5A4D);
         writer.Write(bytesInLastBlock);

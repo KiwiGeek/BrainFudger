@@ -1,7 +1,8 @@
 using System.Text;
 using System.Runtime.InteropServices;
+using BrainFucker.Models;
 
-namespace BrainFucker;
+namespace BrainFucker.Emitters;
 
 internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 {
@@ -33,15 +34,15 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        var dataSection = BuildDataSection(options);
-        var importSection = BuildImportSection();
-        var codeImage = BuildCodeImage(sanitizedSource);
+        SectionImage dataSection = BuildDataSection(options);
+        SectionImage importSection = BuildImportSection();
+        X86CodeImage codeImage = BuildCodeImage(sanitizedSource);
         return PortableExecutableWriter32.WriteExecutable(codeImage, importSection, dataSection);
     }
 
     private static SectionImage BuildDataSection(CompilerOptions options)
     {
-        var builder = new SectionBuilder();
+        SectionBuilder builder = new();
         builder.Align(16);
         builder.DefineLabel("stdin_handle");
         builder.WriteUInt32(0);
@@ -62,7 +63,7 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     private static SectionImage BuildImportSection()
     {
-        var builder = new SectionBuilder();
+        SectionBuilder builder = new();
         builder.DefineLabel("import_descriptor");
         builder.WriteLabelReference32("import_lookup_table");
         builder.WriteUInt32(0);
@@ -115,7 +116,7 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     private static X86CodeImage BuildCodeImage(string sanitized)
     {
-        var assembler = new X86Assembler();
+        X86Assembler assembler = new();
         EmitPrologue(assembler);
         EmitProgram(assembler, sanitized);
         assembler.Jump("program_exit");
@@ -148,17 +149,17 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     private static void EmitProgram(X86Assembler assembler, string sanitized)
     {
-        var loopStack = new Stack<(string StartLabel, string EndLabel)>();
-        var loopCounter = 0;
-        var inputCounter = 0;
+        Stack<(string StartLabel, string EndLabel)> loopStack = new();
+        int loopCounter = 0;
+        int inputCounter = 0;
 
-        for (var i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < sanitized.Length; i++)
         {
-            var token = sanitized[i];
+            char token = sanitized[i];
 
             if (token is '+' or '-' or '>' or '<')
             {
-                var count = CountRepeatedTokens(sanitized, i, token);
+                int count = CountRepeatedTokens(sanitized, i, token);
                 EmitCompressedOperation(assembler, token, count);
                 i += count - 1;
                 continue;
@@ -176,8 +177,8 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
                     break;
 
                 case '[':
-                    var startLabel = $"loop_start_{loopCounter}";
-                    var endLabel = $"loop_end_{loopCounter}";
+                    string startLabel = $"loop_start_{loopCounter}";
+                    string endLabel = $"loop_end_{loopCounter}";
                     loopCounter++;
                     assembler.Label(startLabel);
                     assembler.CmpBytePtrEbxImmediate(0);
@@ -186,7 +187,7 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
                     break;
 
                 case ']':
-                    var loop = loopStack.Pop();
+                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
                     assembler.CmpBytePtrEbxImmediate(0);
                     assembler.JumpNotEqual(loop.StartLabel);
                     assembler.Label(loop.EndLabel);
@@ -236,8 +237,8 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     private static void EmitReadByte(X86Assembler assembler, int inputIndex)
     {
-        var zeroLabel = $"input_zero_{inputIndex}";
-        var doneLabel = $"input_done_{inputIndex}";
+        string zeroLabel = $"input_zero_{inputIndex}";
+        string doneLabel = $"input_done_{inputIndex}";
 
         assembler.PushImmediate32(0);
         assembler.PushLabelAddress("io_result");
@@ -271,7 +272,7 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     private static int CountRepeatedTokens(string source, int start, char token)
     {
-        var count = 0;
+        int count = 0;
         while (start + count < source.Length && source[start + count] == token)
         {
             count++;
@@ -319,15 +320,15 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        var dataSection = BuildDataSection(options);
-        var importSection = BuildImportSection();
-        var codeImage = BuildCodeImage(sanitizedSource);
+        SectionImage dataSection = BuildDataSection(options);
+        SectionImage importSection = BuildImportSection();
+        CodeImage codeImage = BuildCodeImage(sanitizedSource);
         return PortableExecutableWriter.WriteExecutable(codeImage, importSection, dataSection);
     }
 
     private static SectionImage BuildDataSection(CompilerOptions options)
     {
-        var builder = new SectionBuilder();
+        SectionBuilder builder = new();
         builder.Align(16);
         builder.DefineLabel("tape");
         builder.WriteZeros(options.CellCount);
@@ -342,7 +343,7 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     private static SectionImage BuildImportSection()
     {
-        var builder = new SectionBuilder();
+        SectionBuilder builder = new();
         builder.DefineLabel("import_descriptor");
         builder.WriteLabelReference32("import_lookup_table");
         builder.WriteUInt32(0);
@@ -395,7 +396,7 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     private static CodeImage BuildCodeImage(string sanitized)
     {
-        var assembler = new X64Assembler();
+        X64Assembler assembler = new();
         EmitPrologue(assembler);
         EmitProgram(assembler, sanitized);
         assembler.Jump("program_exit");
@@ -430,17 +431,17 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     private static void EmitProgram(X64Assembler assembler, string sanitized)
     {
-        var loopStack = new Stack<(string StartLabel, string EndLabel)>();
-        var loopCounter = 0;
-        var inputCounter = 0;
+        Stack<(string StartLabel, string EndLabel)> loopStack = new();
+        int loopCounter = 0;
+        int inputCounter = 0;
 
-        for (var i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < sanitized.Length; i++)
         {
-            var token = sanitized[i];
+            char token = sanitized[i];
 
             if (token is '+' or '-' or '>' or '<')
             {
-                var count = CountRepeatedTokens(sanitized, i, token);
+                int count = CountRepeatedTokens(sanitized, i, token);
                 EmitCompressedOperation(assembler, token, count);
                 i += count - 1;
                 continue;
@@ -458,8 +459,8 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
                     break;
 
                 case '[':
-                    var startLabel = $"loop_start_{loopCounter}";
-                    var endLabel = $"loop_end_{loopCounter}";
+                    string startLabel = $"loop_start_{loopCounter}";
+                    string endLabel = $"loop_end_{loopCounter}";
                     loopCounter++;
                     assembler.Label(startLabel);
                     assembler.CmpBytePtrRbxImmediate(0);
@@ -468,7 +469,7 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
                     break;
 
                 case ']':
-                    var loop = loopStack.Pop();
+                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
                     assembler.CmpBytePtrRbxImmediate(0);
                     assembler.JumpNotEqual(loop.StartLabel);
                     assembler.Label(loop.EndLabel);
@@ -517,8 +518,8 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     private static void EmitReadByte(X64Assembler assembler, int inputIndex)
     {
-        var zeroLabel = $"input_zero_{inputIndex}";
-        var doneLabel = $"input_done_{inputIndex}";
+        string zeroLabel = $"input_zero_{inputIndex}";
+        string doneLabel = $"input_done_{inputIndex}";
 
         assembler.MovRegReg(AssemblerRegister.Rcx, AssemblerRegister.R14);
         assembler.MovRegReg(AssemblerRegister.Rdx, AssemblerRegister.Rbx);
@@ -550,7 +551,7 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 
     private static int CountRepeatedTokens(string source, int start, char token)
     {
-        var count = 0;
+        int count = 0;
         while (start + count < source.Length && source[start + count] == token)
         {
             count++;
@@ -649,47 +650,47 @@ internal static class PortableExecutableWriter32
 
     public static byte[] WriteExecutable(X86CodeImage codeImage, SectionImage importSection, SectionImage dataSection)
     {
-        var textSection = new PeSection(".text", codeImage.Content, 0x60000020);
-        var importPeSection = new PeSection(".idata", importSection.Content, 0x40000040);
-        var dataPeSection = new PeSection(".data", dataSection.Content, 0xC0000040);
-        var sections = new List<PeSection> { textSection, importPeSection, dataPeSection };
+        PeSection textSection = new(".text", codeImage.Content, 0x60000020);
+        PeSection importPeSection = new(".idata", importSection.Content, 0x40000040);
+        PeSection dataPeSection = new(".data", dataSection.Content, 0xC0000040);
+        List<PeSection> sections = new() { textSection, importPeSection, dataPeSection };
 
-        var sizeOfHeaders = Align(0x80u + 4u + 20u + 0xE0u + (uint)(sections.Count * 40), FileAlignment);
-        var currentRawPointer = sizeOfHeaders;
-        foreach (var section in sections)
+        uint sizeOfHeaders = Align(0x80u + 4u + 20u + 0xE0u + (uint)(sections.Count * 40), FileAlignment);
+        uint currentRawPointer = sizeOfHeaders;
+        foreach (PeSection section in sections)
         {
             section.PointerToRawData = currentRawPointer;
             section.SizeOfRawData = Align((uint)section.Content.Length, FileAlignment);
             currentRawPointer += section.SizeOfRawData;
         }
 
-        var currentRva = SectionAlignment;
-        foreach (var section in sections)
+        uint currentRva = SectionAlignment;
+        foreach (PeSection section in sections)
         {
             section.VirtualAddress = currentRva;
             section.VirtualSize = (uint)section.Content.Length;
             currentRva += Align(section.VirtualSize, SectionAlignment);
         }
 
-        var fixedImportSection = PatchImportSection(importSection, importPeSection.VirtualAddress);
+        SectionImage fixedImportSection = PatchImportSection(importSection, importPeSection.VirtualAddress);
         importPeSection.Content = fixedImportSection.Content;
 
-        var importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
-        var importDirectorySize = 40u;
-        var iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
-        var iatSize = 20u;
-        var sizeOfImage = currentRva;
+        uint importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
+        uint importDirectorySize = 40u;
+        uint iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
+        uint iatSize = 20u;
+        uint sizeOfImage = currentRva;
 
         textSection.Content = PatchTextSection(codeImage, fixedImportSection, dataSection, textSection.VirtualAddress, importPeSection.VirtualAddress, dataPeSection.VirtualAddress);
 
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
+        using MemoryStream stream = new();
+        using BinaryWriter writer = new(stream, Encoding.ASCII, leaveOpen: true);
 
         WriteDosHeader(writer);
         WritePeHeaders(writer, sections, sizeOfHeaders, sizeOfImage, importDescriptorRva, importDirectorySize, iatRva, iatSize);
         PadTo(writer, sizeOfHeaders);
 
-        foreach (var section in sections)
+        foreach (PeSection section in sections)
         {
             WriteSection(writer, section);
         }
@@ -699,10 +700,10 @@ internal static class PortableExecutableWriter32
 
     private static SectionImage PatchImportSection(SectionImage section, uint sectionRva)
     {
-        var content = (byte[])section.Content.Clone();
-        foreach (var reference in section.References)
+        byte[] content = (byte[])section.Content.Clone();
+        foreach (LabelReference reference in section.References)
         {
-            var targetRva = sectionRva + (uint)section.Labels[reference.LabelName];
+            uint targetRva = sectionRva + (uint)section.Labels[reference.LabelName];
             Array.Copy(BitConverter.GetBytes(targetRva), 0, content, reference.Offset, 4);
         }
 
@@ -711,19 +712,19 @@ internal static class PortableExecutableWriter32
 
     private static byte[] PatchTextSection(X86CodeImage codeImage, SectionImage importSection, SectionImage dataSection, uint textRva, uint importRva, uint dataRva)
     {
-        var content = (byte[])codeImage.Content.Clone();
-        foreach (var patch in codeImage.Patches)
+        byte[] content = (byte[])codeImage.Content.Clone();
+        foreach (X86TextPatch patch in codeImage.Patches)
         {
             uint targetRva;
-            if (codeImage.Labels.TryGetValue(patch.LabelName, out var textOffset))
+            if (codeImage.Labels.TryGetValue(patch.LabelName, out int textOffset))
             {
                 targetRva = textRva + (uint)textOffset;
             }
-            else if (importSection.Labels.TryGetValue(patch.LabelName, out var importOffset))
+            else if (importSection.Labels.TryGetValue(patch.LabelName, out int importOffset))
             {
                 targetRva = importRva + (uint)importOffset;
             }
-            else if (dataSection.Labels.TryGetValue(patch.LabelName, out var dataOffset))
+            else if (dataSection.Labels.TryGetValue(patch.LabelName, out int dataOffset))
             {
                 targetRva = dataRva + (uint)dataOffset;
             }
@@ -734,13 +735,13 @@ internal static class PortableExecutableWriter32
 
             if (patch.Kind == X86PatchKind.Relative32)
             {
-                var sourceNextRva = textRva + (uint)patch.NextInstructionOffset;
-                var displacement = unchecked((int)(targetRva - sourceNextRva));
+                uint sourceNextRva = textRva + (uint)patch.NextInstructionOffset;
+                int displacement = unchecked((int)(targetRva - sourceNextRva));
                 Array.Copy(BitConverter.GetBytes(displacement), 0, content, patch.PatchOffset, 4);
             }
             else
             {
-                var absoluteAddress = ImageBase + targetRva;
+                uint absoluteAddress = ImageBase + targetRva;
                 Array.Copy(BitConverter.GetBytes(absoluteAddress), 0, content, patch.PatchOffset, 4);
             }
         }
@@ -823,7 +824,7 @@ internal static class PortableExecutableWriter32
         WriteDataDirectory(writer, 0u, 0u);
         WriteDataDirectory(writer, 0u, 0u);
 
-        foreach (var section in sections)
+        foreach (PeSection section in sections)
         {
             WriteSectionHeader(writer, section);
         }
@@ -837,8 +838,8 @@ internal static class PortableExecutableWriter32
 
     private static void WriteSectionHeader(BinaryWriter writer, PeSection section)
     {
-        var nameBytes = Encoding.ASCII.GetBytes(section.Name);
-        var paddedName = new byte[8];
+        byte[] nameBytes = Encoding.ASCII.GetBytes(section.Name);
+        byte[] paddedName = new byte[8];
         Array.Copy(nameBytes, paddedName, Math.Min(nameBytes.Length, paddedName.Length));
         writer.Write(paddedName);
         writer.Write(section.VirtualSize);
@@ -878,47 +879,47 @@ internal static class PortableExecutableWriter
 
     public static byte[] WriteExecutable(CodeImage codeImage, SectionImage importSection, SectionImage dataSection)
     {
-        var textSection = new PeSection(".text", codeImage.Content, 0x60000020);
-        var importPeSection = new PeSection(".idata", importSection.Content, 0x40000040);
-        var dataPeSection = new PeSection(".data", dataSection.Content, 0xC0000040);
-        var sections = new List<PeSection> { textSection, importPeSection, dataPeSection };
+        PeSection textSection = new(".text", codeImage.Content, 0x60000020);
+        PeSection importPeSection = new(".idata", importSection.Content, 0x40000040);
+        PeSection dataPeSection = new(".data", dataSection.Content, 0xC0000040);
+        List<PeSection> sections = new() { textSection, importPeSection, dataPeSection };
 
-        var sizeOfHeaders = Align(0x80u + 4u + 20u + 0xF0u + (uint)(sections.Count * 40), FileAlignment);
-        var currentRawPointer = sizeOfHeaders;
-        foreach (var section in sections)
+        uint sizeOfHeaders = Align(0x80u + 4u + 20u + 0xF0u + (uint)(sections.Count * 40), FileAlignment);
+        uint currentRawPointer = sizeOfHeaders;
+        foreach (PeSection section in sections)
         {
             section.PointerToRawData = currentRawPointer;
             section.SizeOfRawData = Align((uint)section.Content.Length, FileAlignment);
             currentRawPointer += section.SizeOfRawData;
         }
 
-        var currentRva = SectionAlignment;
-        foreach (var section in sections)
+        uint currentRva = SectionAlignment;
+        foreach (PeSection section in sections)
         {
             section.VirtualAddress = currentRva;
             section.VirtualSize = (uint)section.Content.Length;
             currentRva += Align(section.VirtualSize, SectionAlignment);
         }
 
-        var fixedImportSection = PatchImportSection(importSection, importPeSection.VirtualAddress);
+        SectionImage fixedImportSection = PatchImportSection(importSection, importPeSection.VirtualAddress);
         importPeSection.Content = fixedImportSection.Content;
 
-        var importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
-        var importDirectorySize = 40u;
-        var iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
-        var iatSize = 40u;
-        var sizeOfImage = currentRva;
+        uint importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
+        uint importDirectorySize = 40u;
+        uint iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
+        uint iatSize = 40u;
+        uint sizeOfImage = currentRva;
 
         textSection.Content = PatchTextSection(codeImage, fixedImportSection, dataSection, textSection.VirtualAddress, importPeSection.VirtualAddress, dataPeSection.VirtualAddress);
 
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
+        using MemoryStream stream = new();
+        using BinaryWriter writer = new(stream, Encoding.ASCII, leaveOpen: true);
 
         WriteDosHeader(writer);
         WritePeHeaders(writer, sections, sizeOfHeaders, sizeOfImage, importDescriptorRva, importDirectorySize, iatRva, iatSize);
         PadTo(writer, sizeOfHeaders);
 
-        foreach (var section in sections)
+        foreach (PeSection section in sections)
         {
             WriteSection(writer, section);
         }
@@ -928,10 +929,10 @@ internal static class PortableExecutableWriter
 
     private static SectionImage PatchImportSection(SectionImage section, uint sectionRva)
     {
-        var content = (byte[])section.Content.Clone();
-        foreach (var reference in section.References)
+        byte[] content = (byte[])section.Content.Clone();
+        foreach (LabelReference reference in section.References)
         {
-            var targetRva = sectionRva + (uint)section.Labels[reference.LabelName];
+            uint targetRva = sectionRva + (uint)section.Labels[reference.LabelName];
             if (reference.Width == 4)
             {
                 Array.Copy(BitConverter.GetBytes(targetRva), 0, content, reference.Offset, 4);
@@ -947,19 +948,19 @@ internal static class PortableExecutableWriter
 
     private static byte[] PatchTextSection(CodeImage codeImage, SectionImage importSection, SectionImage dataSection, uint textRva, uint importRva, uint dataRva)
     {
-        var content = (byte[])codeImage.Content.Clone();
-        foreach (var patch in codeImage.Patches)
+        byte[] content = (byte[])codeImage.Content.Clone();
+        foreach (TextPatch patch in codeImage.Patches)
         {
             uint targetRva;
-            if (codeImage.Labels.TryGetValue(patch.LabelName, out var textOffset))
+            if (codeImage.Labels.TryGetValue(patch.LabelName, out int textOffset))
             {
                 targetRva = textRva + (uint)textOffset;
             }
-            else if (importSection.Labels.TryGetValue(patch.LabelName, out var importOffset))
+            else if (importSection.Labels.TryGetValue(patch.LabelName, out int importOffset))
             {
                 targetRva = importRva + (uint)importOffset;
             }
-            else if (dataSection.Labels.TryGetValue(patch.LabelName, out var dataOffset))
+            else if (dataSection.Labels.TryGetValue(patch.LabelName, out int dataOffset))
             {
                 targetRva = dataRva + (uint)dataOffset;
             }
@@ -968,8 +969,8 @@ internal static class PortableExecutableWriter
                 throw new InvalidOperationException($"Unknown patch target '{patch.LabelName}'.");
             }
 
-            var sourceNextRva = textRva + (uint)patch.NextInstructionOffset;
-            var displacement = unchecked((int)(targetRva - sourceNextRva));
+            uint sourceNextRva = textRva + (uint)patch.NextInstructionOffset;
+            int displacement = unchecked((int)(targetRva - sourceNextRva));
             Array.Copy(BitConverter.GetBytes(displacement), 0, content, patch.PatchOffset, 4);
         }
 
@@ -1050,7 +1051,7 @@ internal static class PortableExecutableWriter
         WriteDataDirectory(writer, 0u, 0u);
         WriteDataDirectory(writer, 0u, 0u);
 
-        foreach (var section in sections)
+        foreach (PeSection section in sections)
         {
             WriteSectionHeader(writer, section);
         }
@@ -1064,8 +1065,8 @@ internal static class PortableExecutableWriter
 
     private static void WriteSectionHeader(BinaryWriter writer, PeSection section)
     {
-        var nameBytes = Encoding.ASCII.GetBytes(section.Name);
-        var paddedName = new byte[8];
+        byte[] nameBytes = Encoding.ASCII.GetBytes(section.Name);
+        byte[] paddedName = new byte[8];
         Array.Copy(nameBytes, paddedName, Math.Min(nameBytes.Length, paddedName.Length));
         writer.Write(paddedName);
         writer.Write(section.VirtualSize);
@@ -1311,7 +1312,7 @@ internal sealed class X64Assembler
 
     public void MovReg32Immediate(AssemblerRegister register, int value)
     {
-        var reg = (int)register;
+        int reg = (int)register;
         EmitRex(false, false, false, reg >= 8);
         EmitByte((byte)(0xB8 + (reg & 7)));
         EmitInt32(value);
@@ -1424,7 +1425,7 @@ internal sealed class X64Assembler
 
     private void EmitRex(bool w, bool r, bool x, bool b)
     {
-        var rex = 0x40
+        int rex = 0x40
                   | (w ? 0x08 : 0)
                   | (r ? 0x04 : 0)
                   | (x ? 0x02 : 0)

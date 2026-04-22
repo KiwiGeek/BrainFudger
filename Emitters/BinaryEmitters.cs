@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
+using BrainFucker.Models;
 
-namespace BrainFucker;
+namespace BrainFucker.Emitters;
 
 internal interface IBinaryEmitter
 {
@@ -25,7 +26,7 @@ internal static class BinaryEmitterRegistry
 
     public static IBinaryEmitter Resolve(string targetId)
     {
-        var emitter = Emitters.FirstOrDefault(e => string.Equals(e.TargetId, targetId, StringComparison.OrdinalIgnoreCase));
+        IBinaryEmitter? emitter = Emitters.FirstOrDefault(e => string.Equals(e.TargetId, targetId, StringComparison.OrdinalIgnoreCase));
         return emitter ?? throw new InvalidOperationException(
             $"Unknown target '{targetId}'. Available targets: {string.Join(", ", Emitters.Select(static e => e.TargetId))}.");
     }

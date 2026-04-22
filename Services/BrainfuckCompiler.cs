@@ -1,4 +1,7 @@
-namespace BrainFucker;
+using BrainFucker.Emitters;
+using BrainFucker.Models;
+
+namespace BrainFucker.Services;
 
 internal static class BrainfuckCompiler
 {
@@ -6,16 +9,16 @@ internal static class BrainfuckCompiler
 
     public static byte[] Compile(string source, CompilerOptions options, IBinaryEmitter emitter)
     {
-        var sanitized = new string(source.Where(SignificantTokens.Contains).ToArray());
+        string sanitized = new(source.Where(SignificantTokens.Contains).ToArray());
         ValidateLoops(sanitized);
         return emitter.EmitBinary(sanitized, options);
     }
 
     private static void ValidateLoops(string source)
     {
-        var stack = new Stack<int>();
+        Stack<int> stack = new();
 
-        for (var i = 0; i < source.Length; i++)
+        for (int i = 0; i < source.Length; i++)
         {
             switch (source[i])
             {

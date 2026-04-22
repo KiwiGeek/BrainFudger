@@ -2,6 +2,9 @@ using System.Diagnostics;
 using Spectre.Console;
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using BrainFucker.Models;
+using BrainFucker.Emitters;
+using BrainFucker.Services;
 
 namespace BrainFucker;
 
@@ -9,13 +12,13 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
-        var normalizedArgs = args
+        string[] normalizedArgs = args
             .Where(static arg => !string.IsNullOrWhiteSpace(arg))
             .Select(static arg => arg.Trim())
             .ToArray();
 
-        var suppressPrettyRunOutput = normalizedArgs.Any(static arg => string.Equals(arg, "--quiet-run", StringComparison.OrdinalIgnoreCase));
-        var listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
+        bool suppressPrettyRunOutput = normalizedArgs.Any(static arg => string.Equals(arg, "--quiet-run", StringComparison.OrdinalIgnoreCase));
+        bool listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
 
         if (listTargets)
         {
@@ -29,8 +32,8 @@ internal static class Program
             return 1;
         }
 
-        var command = BuildCommand();
-        var parseResult = command.Parse(normalizedArgs);
+        RootCommand command = BuildCommand();
+        ParseResult parseResult = command.Parse(normalizedArgs);
 
         if (normalizedArgs.Any(static arg => arg is "-h" or "--help"))
         {
@@ -49,38 +52,38 @@ internal static class Program
 
     private static RootCommand BuildCommand()
     {
-        var inputArgument = new Argument<FileInfo>("input")
+        Argument<FileInfo> inputArgument = new("input")
         {
             Description = "Path to the Brainfuck source file."
         };
 
-        var outputOption = new Option<FileInfo?>("--output", ["-o"])
+        Option<FileInfo?> outputOption = new("--output", "-o")
         {
             Description = "Write the generated binary to this path."
         };
 
-        var runOption = new Option<bool>("--run", [])
+        Option<bool> runOption = new("--run")
         {
             Description = "Build to an OS temp directory, execute it, then clean it up."
         };
 
-        var quietRunOption = new Option<bool>("--quiet-run", [])
+        Option<bool> quietRunOption = new("--quiet-run")
         {
             Description = "When used with --run, suppress compile spinner and success panels so only the program output is shown."
         };
 
-        var listTargetsOption = new Option<bool>("--list-targets", [])
+        Option<bool> listTargetsOption = new("--list-targets")
         {
             Description = "List the available binary targets and exit."
         };
 
-        var cellsOption = new Option<int>("--cells", [])
+        Option<int> cellsOption = new("--cells")
         {
             Description = "Number of tape cells to allocate in the generated program.",
             DefaultValueFactory = static _ => 30000
         };
 
-        var targetOption = new Option<string>("--target", [])
+        Option<string> targetOption = new("--target")
         {
             Description = "Binary emitter target identifier. Available: win32-x64, win32-x86, msdos-com, msdos-exe.",
             DefaultValueFactory = static _ => "win32-x64"
@@ -94,7 +97,7 @@ internal static class Program
             }
         });
 
-        var command = new RootCommand("Compile Brainfuck source into a native executable.")
+        RootCommand command = new("Compile Brainfuck source into a native executable.")
         {
             inputArgument,
             outputOption,
@@ -108,9 +111,9 @@ internal static class Program
         command.TreatUnmatchedTokensAsErrors = true;
         command.Validators.Add(result =>
         {
-            var run = result.GetValue(runOption);
-            var quietRun = result.GetValue(quietRunOption);
-            var output = result.GetValue(outputOption);
+            bool run = result.GetValue(runOption);
+            bool quietRun = result.GetValue(quietRunOption);
+            FileInfo? output = result.GetValue(outputOption);
             if (run && output is not null)
             {
                 result.AddError("The --run option cannot be combined with -o/--output.");
@@ -124,14 +127,14 @@ internal static class Program
 
         command.SetAction(async parseResult =>
         {
-            var input = parseResult.GetValue(inputArgument);
-            var output = parseResult.GetValue(outputOption);
-            var run = parseResult.GetValue(runOption);
-            var quietRun = parseResult.GetValue(quietRunOption);
-            var cells = parseResult.GetValue(cellsOption);
-            var target = parseResult.GetValue(targetOption);
+            FileInfo? input = parseResult.GetValue(inputArgument);
+            FileInfo? output = parseResult.GetValue(outputOption);
+            bool run = parseResult.GetValue(runOption);
+            bool quietRun = parseResult.GetValue(quietRunOption);
+            int cells = parseResult.GetValue(cellsOption);
+            string? target = parseResult.GetValue(targetOption);
 
-            var options = CreateCompilerOptions(input, output, run, quietRun, cells, target);
+            CompilerOptions options = CreateCompilerOptions(input, output, run, quietRun, cells, target);
             return await ExecuteAsync(options);
         });
 
@@ -142,13 +145,13 @@ internal static class Program
     {
         try
         {
-            var emitter = BinaryEmitterRegistry.Resolve(options.Target);
-            if (options.Run && !emitter.CanExecuteOnCurrentPlatform(out var reason))
+            IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(options.Target);
+            if (options.Run && !emitter.CanExecuteOnCurrentPlatform(out string reason))
             {
                 throw new InvalidOperationException(reason);
             }
 
-            var source = await File.ReadAllTextAsync(options.InputPath);
+            string source = await File.ReadAllTextAsync(options.InputPath);
             byte[] binary = [];
 
             if (options.QuietRun)
@@ -180,10 +183,10 @@ internal static class Program
 
     private static CompilerOptions CreateCompilerOptions(FileInfo? input, FileInfo? output, bool run, bool quietRun, int cells, string? target)
     {
-        var inputPath = input?.FullName ?? string.Empty;
-        var resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target;
-        var emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
-        var outputPath = run
+        string inputPath = input?.FullName ?? string.Empty;
+        string resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target;
+        IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
+        string outputPath = run
             ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)
             : (output?.FullName ?? Path.GetFullPath(Path.ChangeExtension(inputPath, emitter.DefaultFileExtension)));
 
@@ -201,8 +204,8 @@ internal static class Program
 
     private static async Task<int> BuildBinaryAsync(CompilerOptions options, IBinaryEmitter emitter, byte[] binary)
     {
-        var outputPath = Path.GetFullPath(options.OutputPath);
-        var outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
+        string outputPath = Path.GetFullPath(options.OutputPath);
+        string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, binary);
 
@@ -212,8 +215,8 @@ internal static class Program
 
     private static async Task<int> BuildRunAndCleanUpAsync(CompilerOptions options, IBinaryEmitter emitter, byte[] binary)
     {
-        var outputPath = Path.GetFullPath(options.OutputPath);
-        var outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
+        string outputPath = Path.GetFullPath(options.OutputPath);
+        string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, binary);
 
@@ -224,14 +227,12 @@ internal static class Program
 
         try
         {
-            using var process = new Process
+            using Process process = new();
+            process.StartInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = outputPath,
-                    UseShellExecute = false,
-                    WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(options.InputPath)) ?? Directory.GetCurrentDirectory()
-                }
+                FileName = outputPath,
+                UseShellExecute = false,
+                WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(options.InputPath)) ?? Directory.GetCurrentDirectory()
             };
 
             process.Start();
@@ -246,9 +247,9 @@ internal static class Program
 
     private static string CreateTemporaryOutputPath(string inputPath, string extension)
     {
-        var tempRoot = Path.Combine(Path.GetTempPath(), "BrainFucker");
-        var tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
-        var fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
+        string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFucker");
+        string tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
+        string fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
         return Path.Combine(tempDirectory, fileName);
     }
 
@@ -256,8 +257,8 @@ internal static class Program
     {
         try
         {
-            var tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFucker"));
-            var fullDirectoryPath = Path.GetFullPath(directoryPath);
+            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFucker"));
+            string fullDirectoryPath = Path.GetFullPath(directoryPath);
 
             if (!fullDirectoryPath.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
@@ -280,7 +281,7 @@ internal static class Program
         AnsiConsole.Write(new FigletText("BrainFucker").Color(Color.DeepSkyBlue2));
         AnsiConsole.Write(new Markup("[grey]Compile Brainfuck source into a native executable.[/]\n\n"));
 
-        var usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
+        Table usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
             $"[white]brainfucker[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
             $"[blue]{Markup.Escape("[-o output.exe|output.com]")}[/] " +
@@ -292,7 +293,7 @@ internal static class Program
         AnsiConsole.Write(usage);
         AnsiConsole.WriteLine();
 
-        var options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
+        Table options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
         options.AddRow("[yellow]<input>[/]", "Path to the Brainfuck source file.");
         options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
         options.AddRow("[green]--run[/]", "Build to an OS temp directory, execute it, then clean it up.");
@@ -307,7 +308,7 @@ internal static class Program
 
     private static void RenderTargetList()
     {
-        var table = new Table().RoundedBorder().AddColumns("[aqua]Target[/]", "[aqua]Output[/]", "[aqua]Description[/]");
+        Table table = new Table().RoundedBorder().AddColumns("[aqua]Target[/]", "[aqua]Output[/]", "[aqua]Description[/]");
         table.AddRow("win32-x64", ".exe", "Win32 x64 PE executable");
         table.AddRow("win32-x86", ".exe", "Win32 x86 PE executable");
         table.AddRow("msdos-com", ".com", "MS-DOS 16-bit COM program");
@@ -319,7 +320,7 @@ internal static class Program
     {
         if (plainText)
         {
-            foreach (var error in parseResult.Errors)
+            foreach (ParseError error in parseResult.Errors)
             {
                 Console.Error.WriteLine(error.Message);
             }
@@ -327,7 +328,7 @@ internal static class Program
             return;
         }
 
-        var panel = new Panel(string.Join(Environment.NewLine, parseResult.Errors.Select(static e => $"[red]-[/] {Markup.Escape(e.Message)}")))
+        Panel panel = new Panel(string.Join(Environment.NewLine, parseResult.Errors.Select(static e => $"[red]-[/] {Markup.Escape(e.Message)}")))
             .Header("[red]Argument Error[/]")
             .Border(BoxBorder.Rounded)
             .BorderStyle(Style.Parse("red"));
@@ -348,7 +349,7 @@ internal static class Program
 
     private static void RenderSuccess(string title, string emitterDisplayName, string outputPath)
     {
-        var grid = new Grid();
+        Grid grid = new();
         grid.AddColumn();
         grid.AddColumn();
         grid.AddRow("[green]Emitter[/]", Markup.Escape(emitterDisplayName));
@@ -375,15 +376,4 @@ internal static class Program
                 .Border(BoxBorder.Rounded)
                 .BorderStyle(Style.Parse("red")));
     }
-}
-
-internal sealed record CompilerOptions
-{
-    public string InputPath { get; init; } = string.Empty;
-    public string OutputPath { get; init; } = string.Empty;
-    public bool OutputPathExplicit { get; init; }
-    public int CellCount { get; init; } = 30000;
-    public string Target { get; init; } = "win32-x64";
-    public bool Run { get; init; }
-    public bool QuietRun { get; init; }
 }
