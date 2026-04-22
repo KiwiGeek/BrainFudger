@@ -30,11 +30,19 @@ dotnet run -- .\bf_source\hello.bf -o hello.com --target msdos-com
 ```
 
 ```powershell
+dotnet run -- .\bf_source\hello.bf -o hello-dos.exe --target msdos-exe
+```
+
+```powershell
 dotnet run -- .\bf_source\hello.bf --run
 ```
 
 ```powershell
 dotnet run -- .\bf_source\advanced-test.bf --run --quiet-run
+```
+
+```powershell
+dotnet run -- --list-targets
 ```
 
 ```powershell
@@ -49,13 +57,24 @@ When you run `dotnet publish` without specifying `-r`, the project now defaults 
 - `-o`, `--output`: desired output binary path
 - `--run`: build to an OS temp directory, execute the generated binary, then remove it. This only works when the selected target can run on the current host OS.
 - `--quiet-run`: with `--run`, suppress CLI status/success output so only the generated program output is shown
+- `--list-targets`: list the available output targets and exit
 - `--cells <count>`: tape size, defaults to `30000`
-- `--target <id>`: output backend, currently `win32-x64`, `win32-x86`, or `msdos-com`
+- `--target <id>`: output backend, currently `win32-x64`, `win32-x86`, `msdos-com`, or `msdos-exe`
+
+## Target matrix
+
+| Target | Output | Runtime family | `--run` support on this host |
+| --- | --- | --- | --- |
+| `win32-x64` | `.exe` | Windows PE x64 | Yes |
+| `win32-x86` | `.exe` | Windows PE x86 | Yes |
+| `msdos-com` | `.com` | MS-DOS 16-bit COM | No |
+| `msdos-exe` | `.exe` | MS-DOS 16-bit MZ EXE | No |
 
 ## MS-DOS target
 
-The `msdos-com` target emits a 16-bit `.COM` program intended for MS-DOS 5.0-style environments.
+The DOS targets emit 16-bit binaries intended for MS-DOS 5.0-style environments.
 
 - Prefer the `.com` extension for output files
+- Use `.exe` for the `msdos-exe` target
 - `--run` is intentionally blocked for this target on the current host
 - Use DOSBox, FreeDOS, or real DOS hardware to run the generated binary

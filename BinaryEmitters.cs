@@ -16,9 +16,12 @@ internal static class BinaryEmitterRegistry
     private static readonly IBinaryEmitter[] Emitters =
     [
         MsDosComEmitter.Instance,
+        MsDosExeEmitter.Instance,
         Win32X86PortableExecutableEmitter.Instance,
         Win32X64PortableExecutableEmitter.Instance
     ];
+
+    public static IReadOnlyList<IBinaryEmitter> GetAll() => Emitters;
 
     public static IBinaryEmitter Resolve(string targetId)
     {

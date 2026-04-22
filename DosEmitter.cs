@@ -25,6 +25,43 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
+        var program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
+        return DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, ComOrigin);
+    }
+}
+
+internal sealed class MsDosExeEmitter : IBinaryEmitter
+{
+    private const int StackSize = 1024;
+
+    public static MsDosExeEmitter Instance { get; } = new();
+
+    public string TargetId => "msdos-exe";
+
+    public string DisplayName => "MS-DOS MZ executable";
+
+    public string DefaultFileExtension => ".exe";
+
+    public bool CanExecuteOnCurrentPlatform(out string reason)
+    {
+        reason = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? "The target 'msdos-exe' cannot be executed with --run on this host. Use DOSBox, FreeDOS, or a real DOS environment."
+            : "The target 'msdos-exe' cannot be executed with --run on non-DOS hosts. Use DOSBox, FreeDOS, or a real DOS environment.";
+        return false;
+    }
+
+    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    {
+        var program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
+        var imageBytes = DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
+        return DosMzExecutableWriter.WriteExecutable(imageBytes, StackSize);
+    }
+}
+
+internal static class DosBrainfuckEmitter
+{
+    public static DosProgramImage EmitProgramImage(string sanitizedSource, CompilerOptions options)
+    {
         var assembler = new DosAssembler();
         EmitPrologue(assembler);
         EmitProgram(assembler, sanitizedSource);
@@ -34,7 +71,35 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
 
         var codeImage = assembler.ToImage();
         var dataImage = BuildDataImage(options);
-        return PatchAndFlatten(codeImage, dataImage);
+        return new DosProgramImage(codeImage, dataImage);
+    }
+
+    public static byte[] PatchAndFlatten(DosCodeImage codeImage, DosDataImage dataImage, ushort origin)
+    {
+        var output = new byte[codeImage.Content.Length + dataImage.Content.Length];
+        Array.Copy(codeImage.Content, output, codeImage.Content.Length);
+        Array.Copy(dataImage.Content, 0, output, codeImage.Content.Length, dataImage.Content.Length);
+
+        foreach (var patch in codeImage.Patches)
+        {
+            if (!TryResolveTargetOffset(codeImage, dataImage, patch.LabelName, out var targetOffset))
+            {
+                throw new InvalidOperationException($"Unknown patch target '{patch.LabelName}'.");
+            }
+
+            if (patch.Kind == DosPatchKind.Absolute16)
+            {
+                var absoluteOffset = (ushort)(origin + targetOffset);
+                Array.Copy(BitConverter.GetBytes(absoluteOffset), 0, output, patch.PatchOffset, 2);
+            }
+            else
+            {
+                var displacement = unchecked((short)(targetOffset - patch.NextInstructionOffset));
+                Array.Copy(BitConverter.GetBytes(displacement), 0, output, patch.PatchOffset, 2);
+            }
+        }
+
+        return output;
     }
 
     private static DosDataImage BuildDataImage(CompilerOptions options)
@@ -59,34 +124,6 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
         labels[labelName] = bytes.Count;
         bytes.AddRange(Encoding.ASCII.GetBytes(value));
         bytes.Add((byte)'$');
-    }
-
-    private static byte[] PatchAndFlatten(DosCodeImage codeImage, DosDataImage dataImage)
-    {
-        var output = new byte[codeImage.Content.Length + dataImage.Content.Length];
-        Array.Copy(codeImage.Content, output, codeImage.Content.Length);
-        Array.Copy(dataImage.Content, 0, output, codeImage.Content.Length, dataImage.Content.Length);
-
-        foreach (var patch in codeImage.Patches)
-        {
-            if (!TryResolveTargetOffset(codeImage, dataImage, patch.LabelName, out var targetOffset))
-            {
-                throw new InvalidOperationException($"Unknown patch target '{patch.LabelName}'.");
-            }
-
-            if (patch.Kind == DosPatchKind.Absolute16)
-            {
-                var absoluteOffset = (ushort)(ComOrigin + targetOffset);
-                Array.Copy(BitConverter.GetBytes(absoluteOffset), 0, output, patch.PatchOffset, 2);
-            }
-            else
-            {
-                var displacement = unchecked((short)(targetOffset - patch.NextInstructionOffset));
-                Array.Copy(BitConverter.GetBytes(displacement), 0, output, patch.PatchOffset, 2);
-            }
-        }
-
-        return output;
     }
 
     private static bool TryResolveTargetOffset(DosCodeImage codeImage, DosDataImage dataImage, string labelName, out int targetOffset)
@@ -249,6 +286,65 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
         return count;
     }
 }
+
+internal static class DosMzExecutableWriter
+{
+    private const ushort HeaderParagraphs = 2;
+
+    public static byte[] WriteExecutable(byte[] imageBytes, int stackSize)
+    {
+        var imageWithStack = new byte[imageBytes.Length + stackSize];
+        Array.Copy(imageBytes, imageWithStack, imageBytes.Length);
+
+        var headerSizeBytes = HeaderParagraphs * 16;
+        var fileSize = headerSizeBytes + imageWithStack.Length;
+        var blocksInFile = (ushort)((fileSize + 511) / 512);
+        var bytesInLastBlock = (ushort)(fileSize % 512);
+        if (bytesInLastBlock == 0)
+        {
+            bytesInLastBlock = 512;
+        }
+
+        var totalImageSize = imageWithStack.Length;
+        if (totalImageSize > 0xFFF0)
+        {
+            throw new InvalidOperationException("The msdos-exe target currently supports only single-segment images under 64 KB.");
+        }
+
+        var minAllocParagraphs = 0;
+        var maxAllocParagraphs = 0xFFFF;
+        var initialSp = (ushort)totalImageSize;
+
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
+
+        writer.Write((ushort)0x5A4D);
+        writer.Write(bytesInLastBlock);
+        writer.Write(blocksInFile);
+        writer.Write((ushort)0);
+        writer.Write(HeaderParagraphs);
+        writer.Write((ushort)minAllocParagraphs);
+        writer.Write((ushort)maxAllocParagraphs);
+        writer.Write((ushort)0);
+        writer.Write(initialSp);
+        writer.Write((ushort)0);
+        writer.Write((ushort)0);
+        writer.Write((ushort)0);
+        writer.Write((ushort)0x001C);
+        writer.Write((ushort)0);
+        writer.Write(new byte[4]);
+
+        while (stream.Position < headerSizeBytes)
+        {
+            writer.Write((byte)0);
+        }
+
+        writer.Write(imageWithStack);
+        return stream.ToArray();
+    }
+}
+
+internal sealed record DosProgramImage(DosCodeImage CodeImage, DosDataImage DataImage);
 
 internal sealed record DosDataImage(byte[] Content, Dictionary<string, int> Labels);
 

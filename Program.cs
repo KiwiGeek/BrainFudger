@@ -9,18 +9,30 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
-        var suppressPrettyRunOutput = args.Any(static arg => arg == "--quiet-run");
+        var normalizedArgs = args
+            .Where(static arg => !string.IsNullOrWhiteSpace(arg))
+            .Select(static arg => arg.Trim())
+            .ToArray();
 
-        if (args.Length == 0 || args.All(string.IsNullOrWhiteSpace))
+        var suppressPrettyRunOutput = normalizedArgs.Any(static arg => string.Equals(arg, "--quiet-run", StringComparison.OrdinalIgnoreCase));
+        var listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
+
+        if (listTargets)
+        {
+            RenderTargetList();
+            return 0;
+        }
+
+        if (normalizedArgs.Length == 0)
         {
             RenderNoArgumentsMessage();
             return 1;
         }
 
         var command = BuildCommand();
-        var parseResult = command.Parse(args);
+        var parseResult = command.Parse(normalizedArgs);
 
-        if (args.Any(static arg => arg is "-h" or "--help"))
+        if (normalizedArgs.Any(static arg => arg is "-h" or "--help"))
         {
             RenderHelp();
             return 0;
@@ -57,6 +69,11 @@ internal static class Program
             Description = "When used with --run, suppress compile spinner and success panels so only the program output is shown."
         };
 
+        var listTargetsOption = new Option<bool>("--list-targets", [])
+        {
+            Description = "List the available binary targets and exit."
+        };
+
         var cellsOption = new Option<int>("--cells", [])
         {
             Description = "Number of tape cells to allocate in the generated program.",
@@ -65,7 +82,7 @@ internal static class Program
 
         var targetOption = new Option<string>("--target", [])
         {
-            Description = "Binary emitter target identifier. Available: win32-x64, win32-x86, msdos-com.",
+            Description = "Binary emitter target identifier. Available: win32-x64, win32-x86, msdos-com, msdos-exe.",
             DefaultValueFactory = static _ => "win32-x64"
         };
 
@@ -83,6 +100,7 @@ internal static class Program
             outputOption,
             runOption,
             quietRunOption,
+            listTargetsOption,
             cellsOption,
             targetOption
         };
@@ -268,8 +286,9 @@ internal static class Program
             $"[blue]{Markup.Escape("[-o output.exe|output.com]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
+            $"[aqua]{Markup.Escape("[--list-targets]")}[/] " +
             $"[blue]{Markup.Escape("[--cells 30000]")}[/] " +
-            $"[blue]{Markup.Escape("[--target win32-x64|win32-x86|msdos-com]")}[/]");
+            $"[blue]{Markup.Escape("[--target win32-x64|win32-x86|msdos-com|msdos-exe]")}[/]");
         AnsiConsole.Write(usage);
         AnsiConsole.WriteLine();
 
@@ -278,11 +297,22 @@ internal static class Program
         options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
         options.AddRow("[green]--run[/]", "Build to an OS temp directory, execute it, then clean it up.");
         options.AddRow("[grey]--quiet-run[/]", "With --run, suppress CLI prettification so only the program output is shown.");
+        options.AddRow("[aqua]--list-targets[/]", "List the available binary targets and exit.");
         options.AddRow("[grey] [/]", "Only allowed when the selected target can run on the current host OS.");
         options.AddRow("[blue]--cells[/]", "Number of tape cells to allocate. Default: [white]30000[/].");
-        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win32-x64[/], [white]win32-x86[/], [white]msdos-com[/]. Default: [white]win32-x64[/].");
+        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win32-x64[/], [white]win32-x86[/], [white]msdos-com[/], [white]msdos-exe[/]. Default: [white]win32-x64[/].");
         options.AddRow("[blue]-h[/], [blue]--help[/]", "Show this help screen.");
         AnsiConsole.Write(options);
+    }
+
+    private static void RenderTargetList()
+    {
+        var table = new Table().RoundedBorder().AddColumns("[aqua]Target[/]", "[aqua]Output[/]", "[aqua]Description[/]");
+        table.AddRow("win32-x64", ".exe", "Win32 x64 PE executable");
+        table.AddRow("win32-x86", ".exe", "Win32 x86 PE executable");
+        table.AddRow("msdos-com", ".com", "MS-DOS 16-bit COM program");
+        table.AddRow("msdos-exe", ".exe", "MS-DOS 16-bit MZ executable");
+        AnsiConsole.Write(table);
     }
 
     private static void RenderParseErrors(ParseResult parseResult, bool plainText)
