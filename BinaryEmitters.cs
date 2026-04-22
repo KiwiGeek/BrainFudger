@@ -6,6 +6,7 @@ internal interface IBinaryEmitter
 {
     string TargetId { get; }
     string DisplayName { get; }
+    string DefaultFileExtension { get; }
     byte[] EmitBinary(string sanitizedSource, CompilerOptions options);
     bool CanExecuteOnCurrentPlatform(out string reason);
 }
@@ -14,6 +15,7 @@ internal static class BinaryEmitterRegistry
 {
     private static readonly IBinaryEmitter[] Emitters =
     [
+        MsDosComEmitter.Instance,
         Win32X86PortableExecutableEmitter.Instance,
         Win32X64PortableExecutableEmitter.Instance
     ];

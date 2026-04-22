@@ -11,6 +11,8 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 
     public string DisplayName => "Win32 x86 executable";
 
+    public string DefaultFileExtension => ".exe";
+
     public bool CanExecuteOnCurrentPlatform(out string reason)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -294,6 +296,8 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
     public string TargetId => "win32-x64";
 
     public string DisplayName => "Win32 x64 executable";
+
+    public string DefaultFileExtension => ".exe";
 
     public bool CanExecuteOnCurrentPlatform(out string reason)
     {

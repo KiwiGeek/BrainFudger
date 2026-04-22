@@ -44,7 +44,7 @@ internal static class Program
 
         var outputOption = new Option<FileInfo?>("--output", ["-o"])
         {
-            Description = "Write the generated executable to this path."
+            Description = "Write the generated binary to this path."
         };
 
         var runOption = new Option<bool>("--run", [])
@@ -65,7 +65,7 @@ internal static class Program
 
         var targetOption = new Option<string>("--target", [])
         {
-            Description = "Binary emitter target identifier. Available: win32-x64, win32-x86.",
+            Description = "Binary emitter target identifier. Available: win32-x64, win32-x86, msdos-com.",
             DefaultValueFactory = static _ => "win32-x64"
         };
 
@@ -163,9 +163,11 @@ internal static class Program
     private static CompilerOptions CreateCompilerOptions(FileInfo? input, FileInfo? output, bool run, bool quietRun, int cells, string? target)
     {
         var inputPath = input?.FullName ?? string.Empty;
+        var resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target;
+        var emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
         var outputPath = run
-            ? CreateTemporaryOutputPath(inputPath)
-            : (output?.FullName ?? Path.GetFullPath(Path.ChangeExtension(inputPath, ".exe")));
+            ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)
+            : (output?.FullName ?? Path.GetFullPath(Path.ChangeExtension(inputPath, emitter.DefaultFileExtension)));
 
         return new CompilerOptions
         {
@@ -173,7 +175,7 @@ internal static class Program
             OutputPath = outputPath,
             OutputPathExplicit = output is not null,
             CellCount = cells,
-            Target = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target,
+            Target = resolvedTarget,
             Run = run,
             QuietRun = quietRun
         };
@@ -224,11 +226,11 @@ internal static class Program
         }
     }
 
-    private static string CreateTemporaryOutputPath(string inputPath)
+    private static string CreateTemporaryOutputPath(string inputPath, string extension)
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "BrainFucker");
         var tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
-        var fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}.exe";
+        var fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
         return Path.Combine(tempDirectory, fileName);
     }
 
@@ -263,22 +265,22 @@ internal static class Program
         var usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
             $"[white]brainfucker[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
-            $"[blue]{Markup.Escape("[-o output.exe]")}[/] " +
+            $"[blue]{Markup.Escape("[-o output.exe|output.com]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
             $"[blue]{Markup.Escape("[--cells 30000]")}[/] " +
-            $"[blue]{Markup.Escape("[--target win32-x64]")}[/]");
+            $"[blue]{Markup.Escape("[--target win32-x64|win32-x86|msdos-com]")}[/]");
         AnsiConsole.Write(usage);
         AnsiConsole.WriteLine();
 
         var options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
         options.AddRow("[yellow]<input>[/]", "Path to the Brainfuck source file.");
-        options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated executable to this path.");
+        options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
         options.AddRow("[green]--run[/]", "Build to an OS temp directory, execute it, then clean it up.");
         options.AddRow("[grey]--quiet-run[/]", "With --run, suppress CLI prettification so only the program output is shown.");
         options.AddRow("[grey] [/]", "Only allowed when the selected target can run on the current host OS.");
         options.AddRow("[blue]--cells[/]", "Number of tape cells to allocate. Default: [white]30000[/].");
-        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win32-x64[/], [white]win32-x86[/]. Default: [white]win32-x64[/].");
+        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win32-x64[/], [white]win32-x86[/], [white]msdos-com[/]. Default: [white]win32-x64[/].");
         options.AddRow("[blue]-h[/], [blue]--help[/]", "Show this help screen.");
         AnsiConsole.Write(options);
     }
