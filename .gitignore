@@ -1,0 +1,8 @@
+bin/
+obj/
+.dotnet/
+.nuget/
+publish-test/
+publish-no-pdb/
+*.exe
+*.pdb
