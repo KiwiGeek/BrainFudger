@@ -6,3 +6,4 @@ publish-test/
 publish-no-pdb/
 *.exe
 *.pdb
+/.vs/BrainFucker
