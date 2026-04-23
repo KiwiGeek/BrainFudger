@@ -1,4 +1,4 @@
-﻿namespace BrainFucker.Models;
+namespace BrainFudger.Models;
 
 internal sealed record CompilerOptions
 {

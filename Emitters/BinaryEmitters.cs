@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
-using BrainFucker.Models;
+using BrainFudger.Models;
 
-namespace BrainFucker.Emitters;
+namespace BrainFudger.Emitters;
 
 internal interface IBinaryEmitter
 {

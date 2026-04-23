@@ -1,21 +1,19 @@
-﻿# Brainfuck Compiler Target Roadmap
+# BrainFudger Target Roadmap
 
-This document tracks current targets and planned expansions, primarily focused on **real executable formats** in the DOS/Windows ecosystem (with room to expand into other real hardware platforms).
+This document tracks current targets and planned expansions, primarily focused on **real executable formats** in the DOS/Windows ecosystem, with room to branch into other real hardware platforms later.
 
 ---
 
-## ✅ Current Targets
+## Current Targets
 
 - [x] `win32-x64` (PE32+)
 - [x] `win32-x86` (PE32)
-- [x] `msdos-com` (.COM, real mode)
-- [x] `msdos-exe` (MZ .EXE, real mode)
+- [x] `msdos-com` (`.COM`, real mode)
+- [x] `msdos-exe` (`MZ .EXE`, real mode)
 
 ---
 
-## 🎯 Immediate Next Targets (High Priority)
-
-These fill the most obvious historical and architectural gaps.
+## Immediate Next Targets
 
 ### Windows 3.x
 
@@ -25,8 +23,6 @@ These fill the most obvious historical and architectural gaps.
   - Optional:
     - [ ] minimal GUI app
     - [ ] console-style stub behavior
-
----
 
 ### DOS Runtime Variants
 
@@ -40,8 +36,6 @@ These fill the most obvious historical and architectural gaps.
   - Character or block device
   - Entry via driver init strategy routine
 
----
-
 ### Protected Mode DOS
 
 - [ ] `dos-dpmi` (or `dos-extender`)
@@ -51,9 +45,7 @@ These fill the most obvious historical and architectural gaps.
 
 ---
 
-## 🧱 Secondary Targets (Medium Priority)
-
-These expand platform coverage while staying in the same ecosystem.
+## Secondary Targets
 
 ### Additional Windows Architectures
 
@@ -61,12 +53,10 @@ These expand platform coverage while staying in the same ecosystem.
   - PE for Windows on ARM
   - Reuse PE backend, new ISA backend
 
----
-
 ### OS/2
 
 - [ ] `os2-ne`
-  - Early OS/2 executable format (similar lineage to Win16)
+  - Early OS/2 executable format
 
 - [ ] `os2-lx`
   - Later 32-bit OS/2 format
@@ -74,9 +64,7 @@ These expand platform coverage while staying in the same ecosystem.
 
 ---
 
-## 🧪 Experimental / Cursed Targets (Still Real Systems)
-
-These are valid execution environments but push into more unusual territory.
+## Experimental And Delightfully Cursed Targets
 
 - [ ] `dos-overlay`
   - Overlay-based executable layout
@@ -86,30 +74,20 @@ These are valid execution environments but push into more unusual territory.
   - 512-byte bootable binary
   - Real-mode execution at `0x7C00`
   - Extreme size constraints
-  - Likely requires:
-    - peephole optimization
-    - loop specialization
-    - optional stage-2 loader
 
 ---
 
-## 🌍 Non-DOS/Windows Expansion (Future)
-
-Out of scope for now, but planned.
+## Non-DOS/Windows Expansion
 
 ### Firmware / Bare Metal
 
 - [ ] `uefi-x64`
 - [ ] `bios-bootloader`
 
----
-
 ### Unix-like Systems
 
 - [ ] `linux-x64-elf`
 - [ ] `linux-x86-elf`
-
----
 
 ### Retro Platforms
 
@@ -119,33 +97,32 @@ Out of scope for now, but planned.
 
 ---
 
-## 🧠 Compiler Architecture Goals
-
-To support multiple targets cleanly, the compiler should be structured as:
+## Compiler Architecture Goals
 
 ### Frontend / IR
-- Collapse repeated operations
-- Detect common loop idioms:
-  - `[-]` → clear cell
-  - `[->+<]` → move
-- Emit compact intermediate representation
+
+- collapse repeated operations
+- detect common loop idioms:
+  - `[-]` -> clear cell
+  - `[->+<]` -> move
+- emit a compact intermediate representation
 
 ### ISA Backends
+
 - x86 (16/32/64)
 - ARM64
-- (future) 6502, Z80, etc.
+- future weirdness: 6502, Z80, and friends
 
 ### Platform Layers
+
 - DOS (COM/EXE/TSR/SYS)
 - Windows (PE32/PE32+/NE)
 - OS/2
-- (future) others
+- future others
 
 ---
 
-## ⚙️ Useful Feature Flags
-
-These will become necessary as targets expand:
+## Useful Feature Flags
 
 - [ ] `--cell-size` (8/16/32)
 - [ ] `--tape-size`
@@ -157,7 +134,7 @@ These will become necessary as targets expand:
 
 ---
 
-## 🧭 Suggested Implementation Order
+## Suggested Implementation Order
 
 1. `win16-ne`
 2. `dos-tsr`
@@ -170,20 +147,12 @@ These will become necessary as targets expand:
 
 ---
 
-## 🏁 End Goal
+## End Goal
 
-A brainfuck compiler capable of targeting executable formats across the full historical spectrum of the DOS/Windows ecosystem, including:
+A Brainfuck compiler capable of targeting executable formats across the historical spectrum of the DOS/Windows ecosystem, including:
 
 - real mode
 - protected mode
 - segmented Windows
 - modern PE
-- and deeply cursed runtime models
-
----
-
-## Notes
-
-- Prefer reusing container formats (MZ → NE → PE) where possible
-- Separate ISA concerns from executable format concerns
-- Optimize for correctness first, then cursed elegance later
+- and a few runtime models that should probably not exist but clearly want to

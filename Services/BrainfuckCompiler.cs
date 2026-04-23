@@ -1,7 +1,7 @@
-using BrainFucker.Emitters;
-using BrainFucker.Models;
+using BrainFudger.Emitters;
+using BrainFudger.Models;
 
-namespace BrainFucker.Services;
+namespace BrainFudger.Services;
 
 internal static class BrainfuckCompiler
 {

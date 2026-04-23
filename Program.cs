@@ -3,10 +3,10 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Runtime.InteropServices;
 using System.Text;
-using BrainFucker.Models;
-using BrainFucker.Services;
+using BrainFudger.Models;
+using BrainFudger.Services;
 
-namespace BrainFucker;
+namespace BrainFudger;
 
 internal static class Program
 {
@@ -198,12 +198,12 @@ internal static class Program
 
     private static void RenderHelp()
     {
-        AnsiConsole.Write(new FigletText("BrainFucker").Color(Color.DeepSkyBlue2));
+        AnsiConsole.Write(new FigletText("BrainFudger").Color(Color.DeepSkyBlue2));
         AnsiConsole.Write(new Markup("[grey]Compile Brainfuck source into a native executable.[/]\n\n"));
 
         Table usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
-            $"[white]brainfucker[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
+            $"[white]brainfudger[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
             $"[blue]{Markup.Escape("[-o output.exe|output.com]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +

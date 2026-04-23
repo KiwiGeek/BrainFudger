@@ -1,50 +1,53 @@
-# BrainFucker
+# BrainFudger
 
-`BrainFucker` is a small C# Brainfuck compiler with a pluggable binary emitter interface.  It currently ships with Win32 x64, Win32 x86, and MS-DOS backends.
+`BrainFudger` is a C# Brainfuck compiler with pluggable binary emitters. It currently ships with Win32 x64, Win32 x86, MS-DOS `.COM`, and MS-DOS `MZ .EXE` backends.
+
+If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainfuck itself plus the executable formats this project emits.
 
 ## What it does
 
-- Reads a Brainfuck source file
-- Validates matching loop brackets
-- Generates a valid native executable
-- Generates tape bounds checks so invalid pointer moves fail with an error
+- reads a Brainfuck source file
+- validates matching loop brackets
+- generates a valid native executable
+- generates tape bounds checks so invalid pointer moves fail with an error
 
 ## Usage
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf -o hello.exe
+BrainFudger.exe .\bf_source\hello.bf -o hello.exe
 ```
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf -o hello.exe --target win32-x64
+BrainFudger.exe .\bf_source\hello.bf -o hello.exe --target win32-x64
 ```
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf -o hello-x86.exe --target win32-x86
+BrainFudger.exe .\bf_source\hello.bf -o hello-x86.exe --target win32-x86
 ```
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf -o hello.com --target msdos-com
+BrainFudger.exe .\bf_source\hello.bf -o hello.com --target msdos-com
 ```
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf -o hello-dos.exe --target msdos-exe
+BrainFudger.exe .\bf_source\hello.bf -o hello-dos.exe --target msdos-exe
 ```
 
 ```powershell
-BrainFucker.exe .\bf_source\hello.bf --run
+BrainFudger.exe .\bf_source\hello.bf --run
 ```
 
 ```powershell
-BrainFucker.exe --list-targets
+BrainFudger.exe --list-targets
 ```
 
 To publish:
+
 ```powershell
 dotnet publish -c Release
 ```
 
-When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFucker.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
+When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
 
 ## Options
 
@@ -64,8 +67,9 @@ When built on Windows, MSBuild defines the GUI compile symbol automatically, so 
 | `msdos-com` | `.com` | MS-DOS 16-bit COM | ❌ | ❌ |
 | `msdos-exe` | `.exe` | MS-DOS 16-bit EXE | ❌ | ❌ |
 
-## MS-DOS target
+## MS-DOS targets
 
 The DOS targets emit 16-bit binaries intended for MS-DOS 5.0-style environments.
 
 - Use DOSBox, FreeDOS, or real DOS hardware to run the generated binary
+- See [docs/msdos-com.md](./docs/msdos-com.md) and [docs/msdos-mz-exe.md](./docs/msdos-mz-exe.md) for the low-level format details

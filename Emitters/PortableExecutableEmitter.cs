@@ -1,8 +1,8 @@
 using System.Text;
 using System.Runtime.InteropServices;
-using BrainFucker.Models;
+using BrainFudger.Models;
 
-namespace BrainFucker.Emitters;
+namespace BrainFudger.Emitters;
 
 internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 {

@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using BrainFucker.Models;
+using BrainFudger.Models;
 
-namespace BrainFucker.Emitters;
+namespace BrainFudger.Emitters;
 
 internal sealed class MsDosComEmitter : IBinaryEmitter
 {

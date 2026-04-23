@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>BrainFudger</AssemblyName>
+    <RootNamespace>BrainFudger</RootNamespace>
     <PublishAot>true</PublishAot>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(PublishAot)' == 'true'">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifiers>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(PublishAot)' == 'true'">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifier>

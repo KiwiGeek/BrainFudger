@@ -1,16 +1,16 @@
 #if BRAINFUCKER_WINDOWS_GUI
 using System.Runtime.InteropServices;
 using System.Text;
-using BrainFucker.Emitters;
-using BrainFucker.Models;
-using BrainFucker.Services;
+using BrainFudger.Emitters;
+using BrainFudger.Models;
+using BrainFudger.Services;
 
-namespace BrainFucker;
+namespace BrainFudger;
 
 internal sealed class WindowsGuiApplication
 {
-    private const string WindowClassName = "BrainFuckerWindowsGui";
-    private const string WindowTitle = "BrainFucker";
+    private const string WindowClassName = "BrainFudgerWindowsGui";
+    private const string WindowTitle = "BrainFudger";
     private const uint WindowMessageBuildCompleted = NativeMethods.WM_APP + 1;
 
     private const int ControlIdInputEdit = 1001;

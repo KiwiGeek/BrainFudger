@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using BrainFucker.Emitters;
-using BrainFucker.Models;
+using BrainFudger.Emitters;
+using BrainFudger.Models;
 
-namespace BrainFucker.Services;
+namespace BrainFudger.Services;
 
 internal sealed record PreparedCompilation(CompilerOptions Options, IBinaryEmitter Emitter, byte[] Binary);
 
@@ -104,7 +104,7 @@ internal static class CompilationWorkflow
 
     private static string CreateTemporaryOutputPath(string inputPath, string extension)
     {
-        string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFucker");
+        string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFudger");
         string tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
         string fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
         return Path.Combine(tempDirectory, fileName);
@@ -139,7 +139,7 @@ internal static class CompilationWorkflow
     {
         try
         {
-            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFucker"));
+            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFudger"));
             string fullDirectoryPath = Path.GetFullPath(directoryPath);
 
             if (!fullDirectoryPath.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
