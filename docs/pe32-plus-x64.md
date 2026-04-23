@@ -1,6 +1,6 @@
-# PE32+ for Win32 x64 🚀🪟
+# PE32+ for Win x64 🚀🪟
 
-This is the 64-bit Windows format used by BrainFudger's `win32-x64` target.
+This is the 64-bit Windows format used by BrainFudger's `win-x64` target.
 
 ## What Changes From x86 PE32?
 

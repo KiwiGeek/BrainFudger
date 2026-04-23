@@ -10,8 +10,12 @@ namespace BrainFudger;
 
 internal static class Program
 {
+    private const string GuiHostArgument = "--gui-host";
+
     private static async Task<int> Main(string[] args)
     {
+        InitializeConsoleRendering();
+
         string[] normalizedArgs = args
             .Where(static arg => !string.IsNullOrWhiteSpace(arg))
             .Select(static arg => arg.Trim())
@@ -21,9 +25,9 @@ internal static class Program
         bool listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
 
 #if BRAINFUCKER_WINDOWS_GUI
-        if (WindowsGuiApplication.IsSupported && normalizedArgs.Length > 0)
+        if (normalizedArgs.Any(static arg => string.Equals(arg, GuiHostArgument, StringComparison.OrdinalIgnoreCase)))
         {
-            WindowsConsoleHost.AttachToParentConsole();
+            return WindowsGuiApplication.IsSupported ? WindowsGuiApplication.Run() : 1;
         }
 #endif
 
@@ -38,6 +42,11 @@ internal static class Program
 #if BRAINFUCKER_WINDOWS_GUI
             if (WindowsGuiApplication.IsSupported)
             {
+                if (WindowsGuiApplication.ShouldLaunchDetached())
+                {
+                    return LaunchDetachedGuiHost();
+                }
+
                 return WindowsGuiApplication.Run();
             }
 #endif
@@ -61,6 +70,31 @@ internal static class Program
         }
 
         return await parseResult.InvokeAsync();
+    }
+
+    private static void InitializeConsoleRendering()
+    {
+        try
+        {
+            Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        }
+        catch
+        {
+            // If the host rejects encoding changes, we'll fall back to ASCII-safe rendering.
+        }
+    }
+
+    private static bool SupportsUnicodeUi()
+    {
+        try
+        {
+            return Console.OutputEncoding.CodePage == 65001;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static RootCommand BuildCommand()
@@ -98,8 +132,8 @@ internal static class Program
 
         Option<string> targetOption = new("--target")
         {
-            Description = "Binary emitter target identifier. Available: win32-x64, win32-x86, msdos-com, msdos-exe.",
-            DefaultValueFactory = static _ => "win32-x64"
+            Description = "Binary emitter target identifier. Available: win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.",
+            DefaultValueFactory = static _ => "win-x64"
         };
 
         cellsOption.Validators.Add(static result =>
@@ -198,18 +232,24 @@ internal static class Program
 
     private static void RenderHelp()
     {
+        if (!SupportsUnicodeUi())
+        {
+            RenderHelpPlainText();
+            return;
+        }
+
         AnsiConsole.Write(new FigletText("BrainFudger").Color(Color.DeepSkyBlue2));
         AnsiConsole.Write(new Markup("[grey]Compile Brainfuck source into a native executable.[/]\n\n"));
 
         Table usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
             $"[white]brainfudger[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
-            $"[blue]{Markup.Escape("[-o output.exe|output.com]")}[/] " +
+            $"[blue]{Markup.Escape("[-o output.exe|output.com|output.macho]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
             $"[aqua]{Markup.Escape("[--list-targets]")}[/] " +
             $"[blue]{Markup.Escape("[--cells 30000]")}[/] " +
-            $"[blue]{Markup.Escape("[--target win32-x64|win32-x86|msdos-com|msdos-exe]")}[/]");
+            $"[blue]{Markup.Escape("[--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]")}[/]");
         AnsiConsole.Write(usage);
         AnsiConsole.WriteLine();
 
@@ -224,30 +264,38 @@ internal static class Program
         options.AddRow("[aqua]--list-targets[/]", "List the available binary targets and exit.");
         options.AddRow("[grey] [/]", "Only allowed when the selected target can run on the current host OS.");
         options.AddRow("[blue]--cells[/]", "Number of tape cells to allocate. Default: [white]30000[/].");
-        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win32-x64[/], [white]win32-x86[/], [white]msdos-com[/], [white]msdos-exe[/]. Default: [white]win32-x64[/].");
+        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win-x64[/], [white]win-x86[/], [white]msdos-com[/], [white]msdos-exe[/], [white]osx-arm64[/]. Default: [white]win-x64[/].");
         options.AddRow("[blue]-h[/], [blue]--help[/]", "Show this help screen.");
         AnsiConsole.Write(options);
     }
 
     private static void RenderTargetList()
     {
+        if (!SupportsUnicodeUi())
+        {
+            RenderTargetListPlainText();
+            return;
+        }
+
         Table table = new Table().RoundedBorder().AddColumns("[aqua]Target[/]", "[aqua]Output[/]", "[aqua]Description[/]");
-        table.AddRow("win32-x64", ".exe", "Win32 x64 PE executable");
-        table.AddRow("win32-x86", ".exe", "Win32 x86 PE executable");
+        table.AddRow("win-x64", ".exe", "Win32 x64 PE executable");
+        table.AddRow("win-x86", ".exe", "Win32 x86 PE executable");
         table.AddRow("msdos-com", ".com", "MS-DOS 16-bit COM program");
         table.AddRow("msdos-exe", ".exe", "MS-DOS 16-bit MZ executable");
+        table.AddRow("osx-arm64", ".macho", "macOS Apple Silicon Mach-O executable");
         AnsiConsole.Write(table);
     }
 
     private static void RenderParseErrors(ParseResult parseResult, bool plainText)
     {
-        if (plainText)
+        if (plainText || !SupportsUnicodeUi())
         {
             foreach (ParseError error in parseResult.Errors)
             {
                 Console.Error.WriteLine(error.Message);
             }
 
+            Console.Error.WriteLine("Run with --help to see usage and options.");
             return;
         }
 
@@ -263,15 +311,31 @@ internal static class Program
 
     private static void RenderNoArgumentsMessage()
     {
+        if (!SupportsUnicodeUi())
+        {
+            Console.WriteLine("No input file was provided.");
+            Console.WriteLine("Run with --help to see usage and options.");
+            return;
+        }
+
         AnsiConsole.Write(
             new Panel("[yellow]No input file was provided.[/]\n[grey]Run with [white]--help[/] to see usage and options.[/]")
                 .Header("[yellow]Nothing To Do[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderStyle(Style.Parse("yellow")));
+        AnsiConsole.WriteLine();
     }
 
     private static void RenderSuccess(string title, string emitterDisplayName, string outputPath)
     {
+        if (!SupportsUnicodeUi())
+        {
+            Console.WriteLine(title);
+            Console.WriteLine($"Emitter: {emitterDisplayName}");
+            Console.WriteLine($"Output: {outputPath}");
+            return;
+        }
+
         Grid grid = new();
         grid.AddColumn();
         grid.AddColumn();
@@ -283,11 +347,12 @@ internal static class Program
                 .Header($"[green]{Markup.Escape(title)}[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderStyle(Style.Parse("green")));
+        AnsiConsole.WriteLine();
     }
 
     private static void RenderException(Exception ex, bool plainText)
     {
-        if (plainText)
+        if (plainText || !SupportsUnicodeUi())
         {
             Console.Error.WriteLine(ex.Message);
             return;
@@ -298,77 +363,154 @@ internal static class Program
                 .Header("[red]Build Failed[/]")
                 .Border(BoxBorder.Rounded)
                 .BorderStyle(Style.Parse("red")));
+        AnsiConsole.WriteLine();
+    }
+
+    private static void RenderHelpPlainText()
+    {
+        Console.WriteLine("BrainFudger");
+        Console.WriteLine("Compile Brainfuck source into a native executable.");
+        Console.WriteLine();
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  brainfudger <input.bf> [-o output.exe|output.com|output.macho] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  <input>           Path to the Brainfuck source file.");
+#if BRAINFUCKER_WINDOWS_GUI
+        Console.WriteLine("  (no arguments)    Launch the native GUI file picker instead of the CLI error panel.");
+#endif
+        Console.WriteLine("  -o, --output      Write the generated binary to this path.");
+        Console.WriteLine("  --run             Build to an OS temp directory, execute it, then clean it up.");
+        Console.WriteLine("  --quiet-run       With --run, suppress CLI prettification so only the program output is shown.");
+        Console.WriteLine("  --list-targets    List the available binary targets and exit.");
+        Console.WriteLine("                    Only allowed when the selected target can run on the current host OS.");
+        Console.WriteLine("  --cells           Number of tape cells to allocate. Default: 30000.");
+        Console.WriteLine("  --target          Available: win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.");
+        Console.WriteLine("                    Default: win-x64.");
+        Console.WriteLine("  -h, --help        Show this help screen.");
+    }
+
+    private static void RenderTargetListPlainText()
+    {
+        Console.WriteLine("Available targets:");
+        Console.WriteLine("  win-x64    .exe    Win32 x64 PE executable");
+        Console.WriteLine("  win-x86    .exe    Win32 x86 PE executable");
+        Console.WriteLine("  msdos-com  .com    MS-DOS 16-bit COM program");
+        Console.WriteLine("  msdos-exe  .exe    MS-DOS 16-bit MZ executable");
+        Console.WriteLine("  osx-arm64  .macho  macOS Apple Silicon Mach-O executable");
     }
 
 #if BRAINFUCKER_WINDOWS_GUI
-    private static class WindowsConsoleHost
+    private static int LaunchDetachedGuiHost()
     {
-        private const uint ATTACH_PARENT_PROCESS = 0xFFFFFFFF;
+        string executablePath = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Could not determine the BrainFudger executable path.");
 
-        public static void AttachToParentConsole()
+        if (!WindowsProcessHost.TryLaunchDetached(executablePath, GuiHostArgument, Environment.CurrentDirectory))
         {
-            if (!OperatingSystem.IsWindows())
-            {
-                return;
-            }
-
-            if (GetConsoleWindow() != 0)
-            {
-                return;
-            }
-
-            if (!AttachConsole(ATTACH_PARENT_PROCESS))
-            {
-                return;
-            }
-
-            RebindStandardStreams();
+            throw new InvalidOperationException("Could not launch the BrainFudger GUI window.");
         }
 
-        private static void RebindStandardStreams()
+        return 0;
+    }
+
+    private static class WindowsProcessHost
+    {
+        private const uint DetachedProcess = 0x00000008;
+        private const uint NewProcessGroup = 0x00000200;
+
+        public static bool TryLaunchDetached(string executablePath, string argument, string workingDirectory)
         {
-            StreamWriter stdoutWriter = CreateConsoleWriter("CONOUT$");
-            StreamWriter stderrWriter = CreateConsoleWriter("CONOUT$");
-            StreamReader stdinReader = CreateConsoleReader("CONIN$");
-
-            Console.SetOut(stdoutWriter);
-            Console.SetError(stderrWriter);
-            Console.SetIn(stdinReader);
-        }
-
-        private static StreamWriter CreateConsoleWriter(string deviceName)
-        {
-            FileStream stream = new(
-                deviceName,
-                FileMode.Open,
-                FileAccess.Write,
-                FileShare.Write,
-                bufferSize: 4096);
-
-            return new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
+            string commandLine = $"\"{executablePath}\" {argument}";
+            StartupInfo startupInfo = new()
             {
-                AutoFlush = true
+                cb = (uint)Marshal.SizeOf<StartupInfo>()
             };
+
+            bool created = CreateProcess(
+                lpApplicationName: executablePath,
+                lpCommandLine: commandLine,
+                lpProcessAttributes: nint.Zero,
+                lpThreadAttributes: nint.Zero,
+                bInheritHandles: false,
+                dwCreationFlags: DetachedProcess | NewProcessGroup,
+                lpEnvironment: nint.Zero,
+                lpCurrentDirectory: workingDirectory,
+                lpStartupInfo: ref startupInfo,
+                lpProcessInformation: out ProcessInformation processInformation);
+
+            if (!created)
+            {
+                return false;
+            }
+
+            try
+            {
+                return true;
+            }
+            finally
+            {
+                if (processInformation.hThread != 0)
+                {
+                    CloseHandle(processInformation.hThread);
+                }
+
+                if (processInformation.hProcess != 0)
+                {
+                    CloseHandle(processInformation.hProcess);
+                }
+            }
         }
 
-        private static StreamReader CreateConsoleReader(string deviceName)
-        {
-            FileStream stream = new(
-                deviceName,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite,
-                bufferSize: 4096);
-
-            return new StreamReader(stream, Console.InputEncoding, detectEncodingFromByteOrderMarks: false, bufferSize: 4096);
-        }
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreateProcess(
+            string lpApplicationName,
+            string lpCommandLine,
+            nint lpProcessAttributes,
+            nint lpThreadAttributes,
+            [MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
+            uint dwCreationFlags,
+            nint lpEnvironment,
+            string lpCurrentDirectory,
+            ref StartupInfo lpStartupInfo,
+            out ProcessInformation lpProcessInformation);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool AttachConsole(uint processId);
+        private static extern bool CloseHandle(nint hObject);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern nint GetConsoleWindow();
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct StartupInfo
+        {
+            public uint cb;
+            public string? lpReserved;
+            public string? lpDesktop;
+            public string? lpTitle;
+            public uint dwX;
+            public uint dwY;
+            public uint dwXSize;
+            public uint dwYSize;
+            public uint dwXCountChars;
+            public uint dwYCountChars;
+            public uint dwFillAttribute;
+            public uint dwFlags;
+            public ushort wShowWindow;
+            public ushort cbReserved2;
+            public nint lpReserved2;
+            public nint hStdInput;
+            public nint hStdOutput;
+            public nint hStdError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ProcessInformation
+        {
+            public nint hProcess;
+            public nint hThread;
+            public uint dwProcessId;
+            public uint dwThreadId;
+        }
     }
 #endif
 }

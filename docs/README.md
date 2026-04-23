@@ -11,10 +11,11 @@ This folder has two jobs:
 
 - [Brainfuck Language](./brainfuck-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
 - [Executable Fundamentals](./executable-fundamentals.md): the general mental model for turning bytes into runnable programs
-- [PE32 for Win32 x86](./pe32-x86.md): 32-bit Windows executables
-- [PE32+ for Win32 x64](./pe32-plus-x64.md): 64-bit Windows executables
+- [PE32 for Win x86](./pe32-x86.md): 32-bit Windows executables
+- [PE32+ for Win x64](./pe32-plus-x64.md): 64-bit Windows executables
 - [MS-DOS `.COM`](./msdos-com.md): the tiny real-mode flat image format
 - [MS-DOS MZ `.EXE`](./msdos-mz-exe.md): segmented DOS executables with an `MZ` header
+- [Mach-O for Apple Silicon](./mach-o-arm64.md): modern macOS executables on ARM64
 
 ## What These Docs Are Trying To Teach
 
@@ -31,14 +32,15 @@ That stack is the whole game. BrainFudger happens to automate it for Brainfuck, 
 
 ## Format Coverage
 
-The project currently emits four real binary targets:
+The project currently emits five real binary targets:
 
 | Target | Container | CPU mode | Typical host |
 | --- | --- | --- | --- |
-| `win32-x64` | PE32+ | x86-64 long mode | modern 64-bit Windows |
-| `win32-x86` | PE32 | 32-bit x86 protected mode | 32-bit Windows, WOW64, some ARM64 Windows |
+| `win-x64` | PE32+ | x86-64 long mode | modern 64-bit Windows |
+| `win-x86` | PE32 | 32-bit x86 protected mode | 32-bit Windows, WOW64, some ARM64 Windows |
 | `msdos-com` | raw `.COM` image | 16-bit x86 real mode | MS-DOS, FreeDOS, DOSBox |
 | `msdos-exe` | MZ `.EXE` | 16-bit x86 real mode | MS-DOS, FreeDOS, DOSBox |
+| `osx-arm64` | Mach-O | ARM64 | Apple Silicon macOS |
 
 ## Important Disclaimer ⚠️
 

@@ -8,7 +8,9 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
 {
     public static Win32X86PortableExecutableEmitter Instance { get; } = new();
 
-    public string TargetId => "win32-x86";
+    public string TargetId => "win-x86";
+
+    public IReadOnlyList<string> Aliases => ["win32-x86"];
 
     public string DisplayName => "Win32 x86 executable";
 
@@ -18,13 +20,13 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            reason = "The target 'win32-x86' can only be executed with --run on Windows hosts.";
+            reason = "The target 'win-x86' can only be executed with --run on Windows hosts.";
             return false;
         }
 
         if (RuntimeInformation.ProcessArchitecture is not Architecture.X86 and not Architecture.X64 and not Architecture.Arm64)
         {
-            reason = $"The target 'win32-x86' cannot be executed with --run on {RuntimeInformation.ProcessArchitecture} hosts.";
+            reason = $"The target 'win-x86' cannot be executed with --run on {RuntimeInformation.ProcessArchitecture} hosts.";
             return false;
         }
 
@@ -294,7 +296,9 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
 {
     public static Win32X64PortableExecutableEmitter Instance { get; } = new();
 
-    public string TargetId => "win32-x64";
+    public string TargetId => "win-x64";
+
+    public IReadOnlyList<string> Aliases => ["win32-x64"];
 
     public string DisplayName => "Win32 x64 executable";
 
@@ -304,13 +308,13 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            reason = "The target 'win32-x64' can only be executed with --run on Windows hosts.";
+            reason = "The target 'win-x64' can only be executed with --run on Windows hosts.";
             return false;
         }
 
         if (RuntimeInformation.ProcessArchitecture is not Architecture.X64 and not Architecture.Arm64)
         {
-            reason = $"The target 'win32-x64' cannot be executed with --run on {RuntimeInformation.ProcessArchitecture} hosts.";
+            reason = $"The target 'win-x64' cannot be executed with --run on {RuntimeInformation.ProcessArchitecture} hosts.";
             return false;
         }
 

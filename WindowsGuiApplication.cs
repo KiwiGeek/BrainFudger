@@ -55,7 +55,7 @@ internal sealed class WindowsGuiApplication
         }
 
         nint consoleWindow = NativeMethods.GetConsoleWindow();
-        if (consoleWindow != 0)
+        if (consoleWindow != 0 && NativeMethods.IsOwnConsoleWindow())
         {
             NativeMethods.ShowWindow(consoleWindow, NativeMethods.SW_HIDE);
         }
@@ -69,6 +69,17 @@ internal sealed class WindowsGuiApplication
             NativeMethods.MessageBox(0, ex.Message, WindowTitle, NativeMethods.MB_ICONERROR | NativeMethods.MB_OK);
             return 1;
         }
+    }
+
+    public static bool ShouldLaunchDetached()
+    {
+        if (!IsSupported)
+        {
+            return false;
+        }
+
+        nint consoleWindow = NativeMethods.GetConsoleWindow();
+        return consoleWindow != 0 && !NativeMethods.IsOwnConsoleWindow();
     }
 
     private WindowsGuiApplication()
@@ -241,7 +252,7 @@ internal sealed class WindowsGuiApplication
             NativeMethods.SendMessageText(_targetComboHandle, NativeMethods.CB_ADDSTRING, 0, emitter.TargetId);
         }
 
-        int defaultIndex = Array.FindIndex(_emitters, static emitter => string.Equals(emitter.TargetId, "win32-x64", StringComparison.OrdinalIgnoreCase));
+        int defaultIndex = Array.FindIndex(_emitters, static emitter => string.Equals(emitter.TargetId, "win-x64", StringComparison.OrdinalIgnoreCase));
         if (defaultIndex < 0)
         {
             defaultIndex = 0;
@@ -1037,6 +1048,16 @@ internal sealed class WindowsGuiApplication
 
             _ = InitCommonControlsEx(ref data);
         }
+
+        public static bool IsOwnConsoleWindow()
+        {
+            Span<uint> processIds = stackalloc uint[8];
+            uint processCount = GetConsoleProcessList(ref MemoryMarshal.GetReference(processIds), (uint)processIds.Length);
+            return processCount == 1;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint GetConsoleProcessList(ref uint processList, uint processCount);
     }
 }
 #endif

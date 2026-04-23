@@ -6,10 +6,11 @@ This document tracks current targets and planned expansions, primarily focused o
 
 ## Current Targets
 
-- [x] `win32-x64` (PE32+)
-- [x] `win32-x86` (PE32)
+- [x] `win-x64` (PE32+)
+- [x] `win-x86` (PE32)
 - [x] `msdos-com` (`.COM`, real mode)
 - [x] `msdos-exe` (`MZ .EXE`, real mode)
+- [x] `osx-arm64` (Mach-O, Apple Silicon)
 
 ---
 
@@ -52,6 +53,15 @@ This document tracks current targets and planned expansions, primarily focused o
 - [ ] `win32-arm64`
   - PE for Windows on ARM
   - Reuse PE backend, new ISA backend
+
+### macOS
+
+- [ ] `osx-x64`
+  - Mach-O for Intel Macs
+
+- [ ] `osx-universal`
+  - fat Mach-O wrapper containing multiple architecture slices
+  - likely composed from `osx-arm64` + `osx-x64`
 
 ### OS/2
 

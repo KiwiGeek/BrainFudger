@@ -13,9 +13,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
-    <OutputType>WinExe</OutputType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <DefineConstants>$(DefineConstants);BRAINFUCKER_WINDOWS_GUI</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PublishDir)' != '' or '$(PublishSingleFile)' == 'true' or '$(PublishAot)' == 'true'">

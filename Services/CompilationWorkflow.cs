@@ -21,7 +21,7 @@ internal static class CompilationWorkflow
         bool pauseAfterRun = false)
     {
         string inputPath = input?.FullName ?? string.Empty;
-        string resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target;
+        string resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win-x64" : target;
         IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
         string outputPath = run
             ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)
@@ -67,6 +67,7 @@ internal static class CompilationWorkflow
         string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, preparedCompilation.Binary);
+        preparedCompilation.Emitter.PrepareFileForExecution(outputPath);
 
         return new CompilationExecutionResult(0, outputPath, preparedCompilation.Emitter.DisplayName, RanBinary: false);
     }
@@ -77,6 +78,7 @@ internal static class CompilationWorkflow
         string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, preparedCompilation.Binary);
+        preparedCompilation.Emitter.PrepareFileForExecution(outputPath);
 
         try
         {
