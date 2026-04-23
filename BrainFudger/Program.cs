@@ -1,17 +1,16 @@
 using Spectre.Console;
+using System.Diagnostics;
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.Runtime.InteropServices;
 using System.Text;
 using BrainFudger.Models;
 using BrainFudger.Services;
+using BrainFudger.Gui;
 
 namespace BrainFudger;
 
 internal static class Program
 {
-    private const string GuiHostArgument = "--gui-host";
-
     private static async Task<int> Main(string[] args)
     {
         InitializeConsoleRendering();
@@ -23,13 +22,12 @@ internal static class Program
 
         bool suppressPrettyRunOutput = normalizedArgs.Any(static arg => string.Equals(arg, "--quiet-run", StringComparison.OrdinalIgnoreCase));
         bool listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
+        IGuiApplicationHost? guiHost = GuiApplicationHostFactory.TryCreateForCurrentPlatform();
 
-#if BRAINFUCKER_WINDOWS_GUI
-        if (normalizedArgs.Any(static arg => string.Equals(arg, GuiHostArgument, StringComparison.OrdinalIgnoreCase)))
+        if (guiHost?.TryHandleHostArguments(normalizedArgs, out int hostExitCode) == true)
         {
-            return WindowsGuiApplication.IsSupported ? WindowsGuiApplication.Run() : 1;
+            return hostExitCode;
         }
-#endif
 
         if (listTargets)
         {
@@ -39,17 +37,15 @@ internal static class Program
 
         if (normalizedArgs.Length == 0)
         {
-#if BRAINFUCKER_WINDOWS_GUI
-            if (WindowsGuiApplication.IsSupported)
+            if (guiHost is not null)
             {
-                if (WindowsGuiApplication.ShouldLaunchDetached())
+                if (!Debugger.IsAttached && guiHost.ShouldLaunchDetached())
                 {
-                    return LaunchDetachedGuiHost();
+                    return guiHost.LaunchDetached();
                 }
 
-                return WindowsGuiApplication.Run();
+                return guiHost.Run();
             }
-#endif
             RenderNoArgumentsMessage();
             return 1;
         }
@@ -255,7 +251,7 @@ internal static class Program
 
         Table options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
         options.AddRow("[yellow]<input>[/]", "Path to the Brainfuck source file.");
-#if BRAINFUCKER_WINDOWS_GUI
+#if WINDOWS
         options.AddRow("[grey](no arguments)[/]", "Launch the native GUI file picker instead of the CLI error panel.");
 #endif
         options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
@@ -376,7 +372,7 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  <input>           Path to the Brainfuck source file.");
-#if BRAINFUCKER_WINDOWS_GUI
+#if WINDOWS || APPLEOSX
         Console.WriteLine("  (no arguments)    Launch the native GUI file picker instead of the CLI error panel.");
 #endif
         Console.WriteLine("  -o, --output      Write the generated binary to this path.");
@@ -399,118 +395,4 @@ internal static class Program
         Console.WriteLine("  msdos-exe  .exe    MS-DOS 16-bit MZ executable");
         Console.WriteLine("  osx-arm64  .macho  macOS Apple Silicon Mach-O executable");
     }
-
-#if BRAINFUCKER_WINDOWS_GUI
-    private static int LaunchDetachedGuiHost()
-    {
-        string executablePath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("Could not determine the BrainFudger executable path.");
-
-        if (!WindowsProcessHost.TryLaunchDetached(executablePath, GuiHostArgument, Environment.CurrentDirectory))
-        {
-            throw new InvalidOperationException("Could not launch the BrainFudger GUI window.");
-        }
-
-        return 0;
-    }
-
-    private static class WindowsProcessHost
-    {
-        private const uint DetachedProcess = 0x00000008;
-        private const uint NewProcessGroup = 0x00000200;
-
-        public static bool TryLaunchDetached(string executablePath, string argument, string workingDirectory)
-        {
-            string commandLine = $"\"{executablePath}\" {argument}";
-            StartupInfo startupInfo = new()
-            {
-                cb = (uint)Marshal.SizeOf<StartupInfo>()
-            };
-
-            bool created = CreateProcess(
-                lpApplicationName: executablePath,
-                lpCommandLine: commandLine,
-                lpProcessAttributes: nint.Zero,
-                lpThreadAttributes: nint.Zero,
-                bInheritHandles: false,
-                dwCreationFlags: DetachedProcess | NewProcessGroup,
-                lpEnvironment: nint.Zero,
-                lpCurrentDirectory: workingDirectory,
-                lpStartupInfo: ref startupInfo,
-                lpProcessInformation: out ProcessInformation processInformation);
-
-            if (!created)
-            {
-                return false;
-            }
-
-            try
-            {
-                return true;
-            }
-            finally
-            {
-                if (processInformation.hThread != 0)
-                {
-                    CloseHandle(processInformation.hThread);
-                }
-
-                if (processInformation.hProcess != 0)
-                {
-                    CloseHandle(processInformation.hProcess);
-                }
-            }
-        }
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CreateProcess(
-            string lpApplicationName,
-            string lpCommandLine,
-            nint lpProcessAttributes,
-            nint lpThreadAttributes,
-            [MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
-            uint dwCreationFlags,
-            nint lpEnvironment,
-            string lpCurrentDirectory,
-            ref StartupInfo lpStartupInfo,
-            out ProcessInformation lpProcessInformation);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(nint hObject);
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct StartupInfo
-        {
-            public uint cb;
-            public string? lpReserved;
-            public string? lpDesktop;
-            public string? lpTitle;
-            public uint dwX;
-            public uint dwY;
-            public uint dwXSize;
-            public uint dwYSize;
-            public uint dwXCountChars;
-            public uint dwYCountChars;
-            public uint dwFillAttribute;
-            public uint dwFlags;
-            public ushort wShowWindow;
-            public ushort cbReserved2;
-            public nint lpReserved2;
-            public nint hStdInput;
-            public nint hStdOutput;
-            public nint hStdError;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ProcessInformation
-        {
-            public nint hProcess;
-            public nint hThread;
-            public uint dwProcessId;
-            public uint dwThreadId;
-        }
-    }
-#endif
 }

@@ -1,11 +1,12 @@
+#if APPLEOSX
 using System.Runtime.InteropServices;
 using BrainFudger.Emitters;
 using BrainFudger.Models;
 using BrainFudger.Services;
 
-namespace BrainFudger.Mac;
+namespace BrainFudger;
 
-internal sealed class MacGuiApplication
+internal sealed class MacGuiApplication : IGuiApplicationHost
 {
     private const string WindowTitle = "BrainFudger";
     private const nuint ActivationPolicyRegular = 0;
@@ -35,10 +36,22 @@ internal sealed class MacGuiApplication
         _emitters = [.. BinaryEmitterRegistry.GetAll()];
     }
 
-    public static int Run()
+    public static MacGuiApplication Instance { get; } = new();
+
+    public bool TryHandleHostArguments(string[] args, out int exitCode)
     {
-        s_current = new MacGuiApplication();
-        return s_current.RunApplication();
+        exitCode = 0;
+        return false;
+    }
+
+    public bool ShouldLaunchDetached() => false;
+
+    public int LaunchDetached() => Run();
+
+    public int Run()
+    {
+        s_current = this;
+        return RunApplication();
     }
 
     private int RunApplication()
@@ -610,3 +623,4 @@ internal sealed class MacGuiApplication
         public delegate bool ObjcShouldTerminate(nint self, nint cmd, nint sender);
     }
 }
+#endif

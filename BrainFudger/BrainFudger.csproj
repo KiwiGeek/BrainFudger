@@ -18,10 +18,21 @@
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
     <DefineConstants>$(DefineConstants);APPLEOSX</DefineConstants>
   </PropertyGroup>
+    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+        <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('FreeBSD'))">
+        <DefineConstants>$(DefineConstants);FREEBSD</DefineConstants>
+    </PropertyGroup>
   <PropertyGroup Condition="'$(PublishDir)' != '' or '$(PublishSingleFile)' == 'true' or '$(PublishAot)' == 'true'">
     <DebugType>None</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="BrainFudger.Mac\**" />
+    <EmbeddedResource Remove="BrainFudger.Mac\**" />
+    <None Remove="BrainFudger.Mac\**" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Spectre.Console" Version="0.54.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.6" />

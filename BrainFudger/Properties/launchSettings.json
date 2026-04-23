@@ -1,0 +1,18 @@
+{
+  "profiles": {
+    "BrainFudger GUI": {
+      "commandName": "Project",
+      "workingDirectory": "."
+    },
+    "BrainFudger CLI Help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help",
+      "workingDirectory": "."
+    },
+    "BrainFudger CLI Sample": {
+      "commandName": "Project",
+      "commandLineArgs": ".\\bf_source\\hello.bf -o .\\hello.exe --target win-x64",
+      "workingDirectory": "."
+    }
+  }
+}
