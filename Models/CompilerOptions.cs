@@ -1,6 +1,6 @@
 namespace BrainFudger.Models;
 
-internal sealed record CompilerOptions
+public sealed record CompilerOptions
 {
     public string InputPath { get; init; } = string.Empty;
     public string OutputPath { get; init; } = string.Empty;

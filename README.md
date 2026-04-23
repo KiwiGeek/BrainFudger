@@ -4,6 +4,12 @@
 
 If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainfuck itself plus the executable formats this project emits.
 
+The repo now has three host layers:
+
+- `BrainFudger.Core`: compiler, emitters, and shared workflow services
+- `BrainFudger`: the CLI plus the native Win32 GUI host
+- `BrainFudger.Mac`: a native AppKit GUI host for macOS
+
 ## What it does
 
 - reads a Brainfuck source file
@@ -52,6 +58,8 @@ dotnet publish -c Release
 ```
 
 When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
+
+On macOS, the `BrainFudger.Mac` project provides a native AppKit window with source/output pickers, target selection, cells input, and Build/Run buttons wired through the same shared workflow layer.
 
 ## Options
 

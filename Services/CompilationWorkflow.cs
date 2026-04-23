@@ -4,11 +4,11 @@ using BrainFudger.Models;
 
 namespace BrainFudger.Services;
 
-internal sealed record PreparedCompilation(CompilerOptions Options, IBinaryEmitter Emitter, byte[] Binary);
+public sealed record PreparedCompilation(CompilerOptions Options, IBinaryEmitter Emitter, byte[] Binary);
 
-internal sealed record CompilationExecutionResult(int ExitCode, string OutputPath, string EmitterDisplayName, bool RanBinary);
+public sealed record CompilationExecutionResult(int ExitCode, string OutputPath, string EmitterDisplayName, bool RanBinary);
 
-internal static class CompilationWorkflow
+public static class CompilationWorkflow
 {
     public static CompilerOptions CreateCompilerOptions(
         FileInfo? input,

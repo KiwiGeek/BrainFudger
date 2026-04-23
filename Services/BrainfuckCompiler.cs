@@ -3,7 +3,7 @@ using BrainFudger.Models;
 
 namespace BrainFudger.Services;
 
-internal static class BrainfuckCompiler
+public static class BrainfuckCompiler
 {
     private static readonly HashSet<char> SignificantTokens = ['>', '<', '+', '-', '.', ',', '[', ']'];
 

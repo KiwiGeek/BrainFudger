@@ -3,7 +3,7 @@ using BrainFudger.Models;
 
 namespace BrainFudger.Emitters;
 
-internal interface IBinaryEmitter
+public interface IBinaryEmitter
 {
     string TargetId { get; }
     string DisplayName { get; }
@@ -14,7 +14,7 @@ internal interface IBinaryEmitter
     void PrepareFileForExecution(string outputPath) { }
 }
 
-internal static class BinaryEmitterRegistry
+public static class BinaryEmitterRegistry
 {
     private static readonly IBinaryEmitter[] Emitters =
     [
