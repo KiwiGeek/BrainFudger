@@ -1,9 +1,9 @@
-using System.Diagnostics;
 using Spectre.Console;
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Runtime.InteropServices;
+using System.Text;
 using BrainFucker.Models;
-using BrainFucker.Emitters;
 using BrainFucker.Services;
 
 namespace BrainFucker;
@@ -20,6 +20,13 @@ internal static class Program
         bool suppressPrettyRunOutput = normalizedArgs.Any(static arg => string.Equals(arg, "--quiet-run", StringComparison.OrdinalIgnoreCase));
         bool listTargets = normalizedArgs.Any(static arg => string.Equals(arg, "--list-targets", StringComparison.OrdinalIgnoreCase));
 
+#if BRAINFUCKER_WINDOWS_GUI
+        if (WindowsGuiApplication.IsSupported && normalizedArgs.Length > 0)
+        {
+            WindowsConsoleHost.AttachToParentConsole();
+        }
+#endif
+
         if (listTargets)
         {
             RenderTargetList();
@@ -28,6 +35,12 @@ internal static class Program
 
         if (normalizedArgs.Length == 0)
         {
+#if BRAINFUCKER_WINDOWS_GUI
+            if (WindowsGuiApplication.IsSupported)
+            {
+                return WindowsGuiApplication.Run();
+            }
+#endif
             RenderNoArgumentsMessage();
             return 1;
         }
@@ -134,7 +147,7 @@ internal static class Program
             int cells = parseResult.GetValue(cellsOption);
             string? target = parseResult.GetValue(targetOption);
 
-            CompilerOptions options = CreateCompilerOptions(input, output, run, quietRun, cells, target);
+            CompilerOptions options = CompilationWorkflow.CreateCompilerOptions(input, output, run, quietRun, cells, target);
             return await ExecuteAsync(options);
         });
 
@@ -145,18 +158,11 @@ internal static class Program
     {
         try
         {
-            IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(options.Target);
-            if (options.Run && !emitter.CanExecuteOnCurrentPlatform(out string reason))
-            {
-                throw new InvalidOperationException(reason);
-            }
-
-            string source = await File.ReadAllTextAsync(options.InputPath);
-            byte[] binary = [];
+            PreparedCompilation? preparedCompilation = null;
 
             if (options.QuietRun)
             {
-                binary = BrainfuckCompiler.Compile(source, options, emitter);
+                preparedCompilation = await CompilationWorkflow.PrepareAsync(options);
             }
             else
             {
@@ -165,114 +171,28 @@ internal static class Program
                     .SpinnerStyle(Style.Parse("deepskyblue2"))
                     .StartAsync("Compiling brainfuck source...", async _ =>
                     {
-                        binary = BrainfuckCompiler.Compile(source, options, emitter);
-                        await Task.CompletedTask;
+                        preparedCompilation = await CompilationWorkflow.PrepareAsync(options);
                     });
             }
 
-            return options.Run
-                ? await BuildRunAndCleanUpAsync(options, emitter, binary)
-                : await BuildBinaryAsync(options, emitter, binary);
+            if (preparedCompilation is null)
+            {
+                throw new InvalidOperationException("Compilation did not produce an output payload.");
+            }
+
+            CompilationExecutionResult result = await CompilationWorkflow.PersistOrRunAsync(preparedCompilation);
+            if (!options.QuietRun)
+            {
+                string title = options.Run ? "Built temporary binary" : "Built binary";
+                RenderSuccess(title, result.EmitterDisplayName, result.OutputPath);
+            }
+
+            return result.ExitCode;
         }
         catch (Exception ex)
         {
             RenderException(ex, options.QuietRun);
             return 1;
-        }
-    }
-
-    private static CompilerOptions CreateCompilerOptions(FileInfo? input, FileInfo? output, bool run, bool quietRun, int cells, string? target)
-    {
-        string inputPath = input?.FullName ?? string.Empty;
-        string resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win32-x64" : target;
-        IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
-        string outputPath = run
-            ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)
-            : (output?.FullName ?? Path.GetFullPath(Path.ChangeExtension(inputPath, emitter.DefaultFileExtension)));
-
-        return new CompilerOptions
-        {
-            InputPath = inputPath,
-            OutputPath = outputPath,
-            OutputPathExplicit = output is not null,
-            CellCount = cells,
-            Target = resolvedTarget,
-            Run = run,
-            QuietRun = quietRun
-        };
-    }
-
-    private static async Task<int> BuildBinaryAsync(CompilerOptions options, IBinaryEmitter emitter, byte[] binary)
-    {
-        string outputPath = Path.GetFullPath(options.OutputPath);
-        string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
-        Directory.CreateDirectory(outputDirectory);
-        await File.WriteAllBytesAsync(outputPath, binary);
-
-        RenderSuccess("Built binary", emitter.DisplayName, outputPath);
-        return 0;
-    }
-
-    private static async Task<int> BuildRunAndCleanUpAsync(CompilerOptions options, IBinaryEmitter emitter, byte[] binary)
-    {
-        string outputPath = Path.GetFullPath(options.OutputPath);
-        string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
-        Directory.CreateDirectory(outputDirectory);
-        await File.WriteAllBytesAsync(outputPath, binary);
-
-        if (!options.QuietRun)
-        {
-            RenderSuccess("Built temporary binary", emitter.DisplayName, outputPath);
-        }
-
-        try
-        {
-            using Process process = new();
-            process.StartInfo = new ProcessStartInfo
-            {
-                FileName = outputPath,
-                UseShellExecute = false,
-                WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(options.InputPath)) ?? Directory.GetCurrentDirectory()
-            };
-
-            process.Start();
-            await process.WaitForExitAsync();
-            return process.ExitCode;
-        }
-        finally
-        {
-            TryDeleteTemporaryDirectory(outputDirectory);
-        }
-    }
-
-    private static string CreateTemporaryOutputPath(string inputPath, string extension)
-    {
-        string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFucker");
-        string tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
-        string fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
-        return Path.Combine(tempDirectory, fileName);
-    }
-
-    private static void TryDeleteTemporaryDirectory(string directoryPath)
-    {
-        try
-        {
-            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFucker"));
-            string fullDirectoryPath = Path.GetFullPath(directoryPath);
-
-            if (!fullDirectoryPath.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            if (Directory.Exists(fullDirectoryPath))
-            {
-                Directory.Delete(fullDirectoryPath, recursive: true);
-            }
-        }
-        catch
-        {
-            // Best-effort cleanup. The compiled program has already finished running.
         }
     }
 
@@ -295,6 +215,9 @@ internal static class Program
 
         Table options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
         options.AddRow("[yellow]<input>[/]", "Path to the Brainfuck source file.");
+#if BRAINFUCKER_WINDOWS_GUI
+        options.AddRow("[grey](no arguments)[/]", "Launch the native GUI file picker instead of the CLI error panel.");
+#endif
         options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
         options.AddRow("[green]--run[/]", "Build to an OS temp directory, execute it, then clean it up.");
         options.AddRow("[grey]--quiet-run[/]", "With --run, suppress CLI prettification so only the program output is shown.");
@@ -376,4 +299,76 @@ internal static class Program
                 .Border(BoxBorder.Rounded)
                 .BorderStyle(Style.Parse("red")));
     }
+
+#if BRAINFUCKER_WINDOWS_GUI
+    private static class WindowsConsoleHost
+    {
+        private const uint ATTACH_PARENT_PROCESS = 0xFFFFFFFF;
+
+        public static void AttachToParentConsole()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            if (GetConsoleWindow() != 0)
+            {
+                return;
+            }
+
+            if (!AttachConsole(ATTACH_PARENT_PROCESS))
+            {
+                return;
+            }
+
+            RebindStandardStreams();
+        }
+
+        private static void RebindStandardStreams()
+        {
+            StreamWriter stdoutWriter = CreateConsoleWriter("CONOUT$");
+            StreamWriter stderrWriter = CreateConsoleWriter("CONOUT$");
+            StreamReader stdinReader = CreateConsoleReader("CONIN$");
+
+            Console.SetOut(stdoutWriter);
+            Console.SetError(stderrWriter);
+            Console.SetIn(stdinReader);
+        }
+
+        private static StreamWriter CreateConsoleWriter(string deviceName)
+        {
+            FileStream stream = new(
+                deviceName,
+                FileMode.Open,
+                FileAccess.Write,
+                FileShare.Write,
+                bufferSize: 4096);
+
+            return new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
+            {
+                AutoFlush = true
+            };
+        }
+
+        private static StreamReader CreateConsoleReader(string deviceName)
+        {
+            FileStream stream = new(
+                deviceName,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 4096);
+
+            return new StreamReader(stream, Console.InputEncoding, detectEncodingFromByteOrderMarks: false, bufferSize: 4096);
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AttachConsole(uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern nint GetConsoleWindow();
+    }
+#endif
 }

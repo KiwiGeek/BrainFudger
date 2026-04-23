@@ -9,4 +9,6 @@ internal sealed record CompilerOptions
     public string Target { get; init; } = "win32-x64";
     public bool Run { get; init; }
     public bool QuietRun { get; init; }
+    public bool UseShellExecuteForRun { get; init; }
+    public bool PauseAfterRun { get; init; }
 }

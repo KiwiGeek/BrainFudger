@@ -44,6 +44,8 @@ To publish:
 dotnet publish -c Release
 ```
 
+When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFucker.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
+
 ## Options
 
 - `-o`, `--output`: desired output binary path

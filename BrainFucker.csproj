@@ -4,10 +4,17 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(PublishAot)' == 'true'">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifiers>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(PublishAot)' == 'true'">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifier>
     <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <DefineConstants>$(DefineConstants);BRAINFUCKER_WINDOWS_GUI</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PublishDir)' != '' or '$(PublishSingleFile)' == 'true' or '$(PublishAot)' == 'true'">
     <DebugType>None</DebugType>

@@ -4,6 +4,8 @@ obj/
 .nuget/
 publish-test/
 publish-no-pdb/
+.vs/
 *.exe
+*.com
 *.pdb
 /.vs/BrainFucker
