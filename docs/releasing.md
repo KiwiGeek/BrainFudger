@@ -107,4 +107,6 @@ Example result: `v1.5.0`
 
 - prerelease tags become GitHub prereleases automatically
 - final tags become normal GitHub releases automatically
-- the release workflow builds all supported host artifacts and uploads them to the GitHub Release
+- the release workflow builds all supported host artifacts and uploads the raw binaries directly to the GitHub Release
+- Windows assets download as `.exe` files directly
+- macOS assets download as raw Mach-O files; after downloading on macOS, run `chmod +x ./BrainFudger-osx-...` before executing them

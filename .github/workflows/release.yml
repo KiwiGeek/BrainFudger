@@ -79,13 +79,20 @@ jobs:
           -p:IncludeSourceRevisionInInformationalVersion=false
           -o "$env:RUNNER_TEMP/publish/${{ matrix.rid }}"
 
-      - name: Package ${{ matrix.rid }}
+      - name: Collect release asset for ${{ matrix.rid }}
         shell: pwsh
         run: |
-          $assetName = "BrainFudger-${{ matrix.rid }}-${{ github.ref_name }}.zip"
           $publishPath = Join-Path $env:RUNNER_TEMP "publish/${{ matrix.rid }}"
+          $extension = if ("${{ matrix.rid }}".StartsWith('win-')) { '.exe' } else { '' }
+          $sourceBinary = Join-Path $publishPath "BrainFudger$extension"
+          $assetName = "BrainFudger-${{ matrix.rid }}-${{ github.ref_name }}$extension"
           $assetPath = Join-Path $env:RUNNER_TEMP $assetName
-          Compress-Archive -Path (Join-Path $publishPath '*') -DestinationPath $assetPath
+
+          if (-not (Test-Path $sourceBinary)) {
+            throw "Expected built binary '$sourceBinary' was not found."
+          }
+
+          Copy-Item -LiteralPath $sourceBinary -Destination $assetPath
           "ASSET_PATH=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Upload packaged artifact
