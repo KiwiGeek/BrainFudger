@@ -56,6 +56,7 @@ How it behaves:
 - if `base_version` is supplied, the workflow uses that release line directly instead of bumping from the latest stable tag
 
 The workflow pushes the tag for you. That tag push then triggers the normal release build workflow.
+Because the tag is created by GitHub Actions, the workflow also explicitly dispatches the build-and-release workflow after pushing the tag.
 
 ## Typical Flows
 
