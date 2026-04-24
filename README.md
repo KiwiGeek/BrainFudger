@@ -57,6 +57,26 @@ To publish:
 dotnet publish -c Release
 ```
 
+## Releases
+
+To publish a GitHub release, create and push a `v` tag from the commit you want to release:
+
+```powershell
+git checkout master
+git pull
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+That tag push triggers `.github/workflows/release.yml`, which builds release assets for the currently supported host RIDs and creates the GitHub Release automatically.
+
+Versioning notes:
+
+- only tags matching `v*` trigger the release workflow
+- assembly version and file version are set from the numeric part of the tag
+- informational version is set to the full tag, including the leading `v`
+- prerelease tags such as `v1.2.3-beta.1` are fine; the numeric assembly/file version becomes `1.2.3.0`
+
 When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
 
 On macOS, the AppKit host provides a native window with source/output pickers, target selection, cells input, and Build/Run buttons wired through the same compilation workflow as the CLI.
