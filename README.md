@@ -57,12 +57,29 @@ dotnet publish -c Release
 
 Alternate branding builds:
 
+Use the MSBuild property `BrandingDirective` to select a non-default branding mode for a build or publish. The property takes one of two values:
+
+- `IAMGARYPENN`: uncensors the public-facing branding and language name
+- `ZEROCOOL`: switches the public-facing branding to `BrainFux0r` and `BrainFux`
+
+Examples:
+
 ```powershell
 dotnet build -p:BrandingDirective=IAMGARYPENN
 ```
 
 ```powershell
 dotnet build -p:BrandingDirective=ZEROCOOL
+```
+
+The same property works with `dotnet publish`:
+
+```powershell
+dotnet publish -c Release -p:BrandingDirective=IAMGARYPENN
+```
+
+```powershell
+dotnet publish -c Release -p:BrandingDirective=ZEROCOOL
 ```
 
 ## Options
@@ -108,5 +125,7 @@ The default build ships with censored public-facing wording. If you want to unce
 
 - `ZEROCOOL`: swaps the public branding to `BrainFux0r` and the language name to `BrainFux`
 - `IAMGARYPENN`: removes all censoring on the branding, and refers to the language by its official name. Extra points if you get the reference. If you google it, you did not get the reference.
+
+Set them through the MSBuild property `BrandingDirective`, for example `dotnet build -p:BrandingDirective=IAMGARYPENN`.
 
 Do not enable both at once.
