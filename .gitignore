@@ -9,3 +9,5 @@ publish-no-pdb/
 *.com
 *.pdb
 /.vs/
+.idea/
+*.user

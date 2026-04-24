@@ -7,7 +7,8 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/BrainFudger.csproj",
+        "${workspaceFolder}/BrainFudger/BrainFudger.csproj",
+        "-p:PublishAot=false",
         "-nologo"
       ],
       "options": {
