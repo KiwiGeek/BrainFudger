@@ -19,6 +19,38 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "build BrainFucker",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/BrainFudger/BrainFudger.csproj",
+        "-p:PublishAot=false",
+        "-p:BrandingDirective=IAMGARYPENN",
+        "-nologo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build BrainFux0r",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/BrainFudger/BrainFudger.csproj",
+        "-p:PublishAot=false",
+        "-p:BrandingDirective=ZEROCOOL",
+        "-nologo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$msCompile"
     }
   ]
 }

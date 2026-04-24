@@ -3,7 +3,7 @@ using BrainFudger.Models;
 
 namespace BrainFudger.Services;
 
-public static class BrainfuckCompiler
+public static class BrainFudgerCompiler
 {
     private static readonly HashSet<char> SignificantTokens = ['>', '<', '+', '-', '.', ',', '[', ']'];
 
@@ -29,7 +29,7 @@ public static class BrainfuckCompiler
                 case ']':
                     if (stack.Count == 0)
                     {
-                        throw new InvalidOperationException($"Unmatched closing bracket at Brainfuck instruction {i}.");
+                        throw new InvalidOperationException($"Unmatched closing bracket at {Branding.LanguageDisplayName} instruction {i}.");
                     }
 
                     stack.Pop();
@@ -39,7 +39,7 @@ public static class BrainfuckCompiler
 
         if (stack.Count > 0)
         {
-            throw new InvalidOperationException($"Unmatched opening bracket at Brainfuck instruction {stack.Peek()}.");
+            throw new InvalidOperationException($"Unmatched opening bracket at {Branding.LanguageDisplayName} instruction {stack.Peek()}.");
         }
     }
 }

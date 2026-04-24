@@ -9,8 +9,6 @@ namespace BrainFudger.Gui;
 
 internal sealed class WindowsGuiApplication : IGuiApplicationHost
 {
-    private const string WindowClassName = "BrainFudgerWindowsGui";
-    private const string WindowTitle = "BrainFudger";
     private const uint WindowMessageBuildCompleted = NativeMethods.WM_APP + 1;
     private const string GuiHostArgument = "--gui-host";
 
@@ -48,6 +46,10 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
 
     public static WindowsGuiApplication Instance { get; } = new();
 
+    private static string WindowClassName => $"{Branding.AppDisplayName}WindowsGui";
+
+    private static string WindowTitle => Branding.AppDisplayName;
+
     public bool TryHandleHostArguments(string[] args, out int exitCode)
     {
         if (args.Any(static arg => string.Equals(arg, GuiHostArgument, StringComparison.OrdinalIgnoreCase)))
@@ -69,11 +71,11 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
     public int LaunchDetached()
     {
         string executablePath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("Could not determine the BrainFudger executable path.");
+            ?? throw new InvalidOperationException($"Could not determine the {Branding.AppDisplayName} executable path.");
 
         if (!WindowsProcessHost.TryLaunchDetached(executablePath, GuiHostArgument, Environment.CurrentDirectory))
         {
-            throw new InvalidOperationException("Could not launch the BrainFudger GUI window.");
+            throw new InvalidOperationException($"Could not launch the {Branding.AppDisplayName} GUI window.");
         }
 
         return 0;
@@ -129,7 +131,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
         ushort atom = NativeMethods.RegisterClassEx(ref windowClass);
         if (atom == 0)
         {
-            throw new InvalidOperationException("Failed to register the BrainFucker window class.");
+            throw new InvalidOperationException($"Failed to register the {Branding.AppDisplayName} window class.");
         }
 
         _windowHandle = NativeMethods.CreateWindowEx(
@@ -148,7 +150,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
 
         if (_windowHandle == 0)
         {
-            throw new InvalidOperationException("Failed to create the BrainFucker window.");
+            throw new InvalidOperationException($"Failed to create the {Branding.AppDisplayName} window.");
         }
 
         NativeMethods.ShowWindow(_windowHandle, NativeMethods.SW_SHOW);
@@ -159,7 +161,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
             int messageResult = NativeMethods.GetMessage(out Msg message, 0, 0, 0);
             if (messageResult == -1)
             {
-                throw new InvalidOperationException("The BrainFucker message loop terminated unexpectedly.");
+                throw new InvalidOperationException($"The {Branding.AppDisplayName} message loop terminated unexpectedly.");
             }
 
             if (messageResult == 0)
@@ -337,9 +339,9 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
             StringBuilder pathBuilder = new(260);
             NativeMethods.DragQueryFile(dropHandle, 0, pathBuilder, (uint)pathBuilder.Capacity);
             string inputPath = pathBuilder.ToString();
-            if (!IsBrainfuckSourcePath(inputPath))
+            if (!IsSourceFilePath(inputPath))
             {
-                ShowWarning("Only .bf files can be dropped into the BrainFucker window.");
+                ShowWarning($"Only .bf files can be dropped into the {Branding.AppDisplayName} window.");
                 return;
             }
 
@@ -356,8 +358,8 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
     private void BrowseForInput()
     {
         string? selectedFile = ShowOpenFileDialog(
-            title: "Select Brainfuck source",
-            filter: "Brainfuck Source (*.bf)\0*.bf\0All Files (*.*)\0*.*\0\0",
+            title: Branding.SourceFilePickerTitle,
+            filter: Branding.SourceFileDialogFilter,
             initialPath: GetControlText(_inputEditHandle));
 
         if (selectedFile is null)
@@ -399,7 +401,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
             }
 
             string inputPath = GetControlText(_inputEditHandle).Trim();
-            if (!IsBrainfuckSourcePath(inputPath))
+            if (!IsSourceFilePath(inputPath))
             {
                 ShowWarning("Select a valid .bf source file before continuing.");
                 return;
@@ -614,7 +616,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
         NativeMethods.MessageBox(_windowHandle, message, WindowTitle, NativeMethods.MB_ICONWARNING | NativeMethods.MB_OK);
     }
 
-    private static bool IsBrainfuckSourcePath(string path) =>
+    private static bool IsSourceFilePath(string path) =>
         !string.IsNullOrWhiteSpace(path)
         && string.Equals(Path.GetExtension(path), ".bf", StringComparison.OrdinalIgnoreCase);
 

@@ -50,7 +50,7 @@ public static class CompilationWorkflow
         }
 
         string source = await File.ReadAllTextAsync(options.InputPath);
-        byte[] binary = BrainfuckCompiler.Compile(source, options, emitter);
+        byte[] binary = BrainFudgerCompiler.Compile(source, options, emitter);
         return new PreparedCompilation(options, emitter, binary);
     }
 
@@ -106,7 +106,7 @@ public static class CompilationWorkflow
 
     private static string CreateTemporaryOutputPath(string inputPath, string extension)
     {
-        string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFudger");
+        string tempRoot = Path.Combine(Path.GetTempPath(), Branding.AppDisplayName);
         string tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
         string fileName = Path.GetFileName(CreateDefaultOutputPath(inputPath, extension));
         return Path.Combine(tempDirectory, fileName);
@@ -198,7 +198,7 @@ public static class CompilationWorkflow
     {
         try
         {
-            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BrainFudger"));
+            string tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), Branding.AppDisplayName));
             string fullDirectoryPath = Path.GetFullPath(directoryPath);
 
             if (!fullDirectoryPath.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))

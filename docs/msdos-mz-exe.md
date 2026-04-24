@@ -88,9 +88,9 @@ BrainFudger's current `msdos-exe` writer does not emit relocations and instead k
 
 ## Shared Payload With `.COM`
 
-The DOS `.EXE` target reuses the same Brainfuck code and data generation logic as the `.COM` target:
+The DOS `.EXE` target reuses the same Brainf$#k code and data generation logic as the `.COM` target:
 
-- same Brainfuck lowering
+- same Brainf$#k lowering
 - same DOS interrupt services
 - same data strings
 - same patching model for label references

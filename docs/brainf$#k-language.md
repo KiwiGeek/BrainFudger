@@ -1,12 +1,12 @@
-# Brainfuck Language Guide 🧠➡️⬅️➕➖
+# Brainf$#k Language Guide 🧠➡️⬅️➕➖
 
-Brainfuck is tiny, hostile, and surprisingly teachable once you stop expecting it to be polite.
+Brainf$#k is tiny, hostile, and surprisingly teachable once you stop expecting it to be polite.
 
 This document covers the language itself, independent of any binary format.
 
 ## Core Model
 
-A Brainfuck program operates on:
+A Brainf$#k program operates on:
 
 - a tape of cells
 - a data pointer that points at the current cell
@@ -20,7 +20,7 @@ In the classic model:
 - arithmetic wraps modulo 256
 - the tape is conceptually unbounded
 
-In BrainFudger's generated binaries:
+In the generated binaries described here:
 
 - cells are 8-bit bytes
 - arithmetic wraps naturally because the emitted instructions modify bytes
@@ -29,7 +29,7 @@ In BrainFudger's generated binaries:
 
 ## The Eight Instructions
 
-Everything else in a Brainfuck source file is comment noise.
+Everything else in a Brainf$#k source file is comment noise.
 
 | Token | Meaning |
 | --- | --- |
@@ -44,7 +44,7 @@ Everything else in a Brainfuck source file is comment noise.
 
 ## Operational Semantics
 
-You can think of Brainfuck as this little machine:
+You can think of Brainf$#k as this little machine:
 
 ```text
 state = {
@@ -67,7 +67,7 @@ Instruction behavior:
 
 ## Input Semantics
 
-This is where Brainfuck implementations become little goblins.
+This is where Brainf$#k implementations become little goblins.
 
 The original language did not standardize EOF behavior. Common choices are:
 
@@ -76,7 +76,7 @@ The original language did not standardize EOF behavior. Common choices are:
 - store `255`
 - signal an error
 
-BrainFudger's emitted binaries do this:
+The emitted binaries described here do this:
 
 - attempt to read one byte
 - if the read fails or reaches EOF, store `0` in the current cell
@@ -85,13 +85,13 @@ That makes programs deterministic across the currently supported targets.
 
 ## Comments And Ignored Characters
 
-Brainfuck only cares about these eight tokens:
+Brainf$#k only cares about these eight tokens:
 
 ```text
 ><+-.,[]
 ```
 
-Everything else is ignored. BrainFudger sanitizes the source by stripping everything except the eight significant tokens before validation or code generation.
+Everything else is ignored. The compiler frontend sanitizes the source by stripping everything except the eight significant tokens before validation or code generation.
 
 ## Loop Matching
 
@@ -111,13 +111,13 @@ That is exactly the strategy used in the compiler frontend.
 
 ### Clear A Cell
 
-```brainfuck
+```text
 [-]
 ```
 
 ### Move A Value Right
 
-```brainfuck
+```text
 [->+<]
 ```
 
@@ -125,15 +125,15 @@ That is exactly the strategy used in the compiler frontend.
 
 Typical copy requires a scratch cell:
 
-```brainfuck
+```text
 [->+>+<<]>>[-<<+>>]
 ```
 
 ### Emit ASCII Text
 
-Brainfuck string literals are usually done by building ASCII values in cells and printing them:
+Brainf$#k string literals are usually done by building ASCII values in cells and printing them:
 
-```brainfuck
+```text
 +++++++++[>+++++++>++++++++++>+++>+<<<<-]
 >++.
 >+.
@@ -148,11 +148,11 @@ Brainfuck string literals are usually done by building ASCII values in cells and
 
 Compilers often compress runs like:
 
-```brainfuck
+```text
 +++++++++
 ```
 
-into a single "add 10" operation. BrainFudger does this for:
+into a single "add 10" operation. The compiler described here does this for:
 
 - `+`
 - `-`
@@ -161,7 +161,7 @@ into a single "add 10" operation. BrainFudger does this for:
 
 ### Tape Bounds
 
-Pure Brainfuck pretends the tape goes on forever. BrainFudger allocates a fixed tape and inserts bounds checks:
+Pure Brainf$#k pretends the tape goes on forever. The implementation described here allocates a fixed tape and inserts bounds checks:
 
 - moving left of the first cell prints an error and exits
 - moving right at or past the end prints an error and exits
@@ -188,14 +188,14 @@ while pc < source.length:
   pc++
 ```
 
-## Hand-Compiling Brainfuck To Machine Code
+## Hand-Compiling Brainf$#k To Machine Code
 
 General recipe:
 
 1. choose where the tape lives
 2. dedicate one register to the current cell pointer
 3. dedicate one or two registers to tape bounds if you need safety checks
-4. translate each Brainfuck token into machine instructions
+4. translate each Brainf$#k token into machine instructions
 5. patch loop jumps once labels are known
 6. add OS-specific output, input, and exit routines
 7. wrap the resulting code in an executable container
@@ -209,4 +209,4 @@ That last step is where the format-specific docs take over.
 - tape length is implementation-defined
 - pointer underflow and overflow behavior is implementation-defined
 
-If you are writing Brainfuck that must run on many implementations, avoid relying on anything except the eight core instruction meanings.
+If you are writing Brainf$#k that must run on many implementations, avoid relying on anything except the eight core instruction meanings.

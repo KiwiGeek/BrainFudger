@@ -82,7 +82,7 @@ DL = character
 INT 21h
 ```
 
-BrainFudger uses this for Brainfuck `.`.
+BrainFudger uses this for Brainf$#k `.`.
 
 ### Read One Byte From Standard Input
 
@@ -99,7 +99,7 @@ On return:
 - `AX` = bytes read
 - `AX = 0` means EOF
 
-BrainFudger uses this for Brainfuck `,` and zeroes the current cell on EOF.
+BrainFudger uses this for Brainf$#k `,` and zeroes the current cell on EOF.
 
 ### Print A `$`-Terminated String
 

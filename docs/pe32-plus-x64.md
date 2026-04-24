@@ -121,7 +121,7 @@ The startup flow is:
 2. call `GetStdHandle` for stdin, stdout, and stderr
 3. store those handles in preserved registers
 4. load tape start and tape end with RIP-relative `lea`
-5. execute translated Brainfuck
+5. execute translated Brainf$#k
 6. call `ExitProcess(0)`
 
 ## Patch Math
