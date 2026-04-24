@@ -1,0 +1,131 @@
+name: Cut Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Branch or commit-ish to tag
+        required: true
+        default: master
+        type: string
+      change_type:
+        description: How to bump the latest stable version when base_version is not supplied
+        required: true
+        default: bugfix
+        type: choice
+        options:
+          - bugfix
+          - feature
+          - breaking
+      release_type:
+        description: final creates vX.Y.Z; alpha/beta/rc create prerelease tags
+        required: true
+        default: final
+        type: choice
+        options:
+          - final
+          - alpha
+          - beta
+          - rc
+      base_version:
+        description: Optional X.Y.Z base version to continue or promote a release line
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --force --tags origin
+
+      - name: Derive release tag
+        shell: pwsh
+        run: |
+          $stableTagPattern = '^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$'
+          $prereleaseTagPattern = '^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)-(?<label>alpha|beta|rc)\.(?<number>\d+)$'
+          $versionPattern = '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$'
+
+          $latestStableTag = git tag --list 'v*' --sort=-version:refname | Where-Object { $_ -match $stableTagPattern } | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($latestStableTag)) {
+            $latestStableTag = 'v0.0.0'
+          }
+
+          $changeType = '${{ inputs.change_type }}'
+          $releaseType = '${{ inputs.release_type }}'
+          $baseVersionInput = '${{ inputs.base_version }}'.Trim()
+
+          if ($baseVersionInput) {
+            if ($baseVersionInput -notmatch $versionPattern) {
+              throw "base_version must be in X.Y.Z format."
+            }
+
+            $major = [int]$Matches.major
+            $minor = [int]$Matches.minor
+            $patch = [int]$Matches.patch
+          }
+          else {
+            if ($latestStableTag -notmatch $stableTagPattern) {
+              throw "Could not parse latest stable tag '$latestStableTag'."
+            }
+
+            $major = [int]$Matches.major
+            $minor = [int]$Matches.minor
+            $patch = [int]$Matches.patch
+
+            switch ($changeType) {
+              'bugfix' { $patch += 1 }
+              'feature' { $minor += 1; $patch = 0 }
+              'breaking' { $major += 1; $minor = 0; $patch = 0 }
+              default { throw "Unsupported change_type '$changeType'." }
+            }
+          }
+
+          $baseVersion = "$major.$minor.$patch"
+
+          if ($releaseType -eq 'final') {
+            $tag = "v$baseVersion"
+          }
+          else {
+            $existingNumbers = git tag --list "v$baseVersion-$releaseType.*" |
+              ForEach-Object {
+                if ($_ -match $prereleaseTagPattern -and $Matches.label -eq $releaseType) {
+                  [int]$Matches.number
+                }
+              } |
+              Where-Object { $_ -ne $null }
+
+            $nextNumber = 1
+            if ($existingNumbers) {
+              $nextNumber = (($existingNumbers | Measure-Object -Maximum).Maximum) + 1
+            }
+
+            $tag = "v$baseVersion-$releaseType.$nextNumber"
+          }
+
+          $existingTag = git tag --list $tag
+          if ($existingTag) {
+            throw "Tag '$tag' already exists."
+          }
+
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Latest stable tag: $latestStableTag"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "New tag: $tag"
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"

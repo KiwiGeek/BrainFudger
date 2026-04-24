@@ -59,23 +59,16 @@ dotnet publish -c Release
 
 ## Releases
 
-To publish a GitHub release, create and push a `v` tag from the commit you want to release:
+Release notes live in [docs/releasing.md](./docs/releasing.md).
 
-```powershell
-git checkout master
-git pull
-git tag v1.2.3
-git push origin v1.2.3
-```
+Short version:
 
-That tag push triggers `.github/workflows/release.yml`, which builds release assets for the currently supported host RIDs and creates the GitHub Release automatically.
-
-Versioning notes:
-
-- only tags matching `v*` trigger the release workflow
-- assembly version and file version are set from the numeric part of the tag
-- informational version is set to the full tag, including the leading `v`
-- prerelease tags such as `v1.2.3-beta.1` are fine; the numeric assembly/file version becomes `1.2.3.0`
+- use semantic tags like `v1.2.3`, `v1.3.0-alpha.1`, or `v2.0.0-rc.1`
+- only `v*` tags trigger the GitHub release workflow
+- `bugfix` bumps patch, `feature` bumps minor, `breaking` bumps major
+- prerelease tags become GitHub prereleases automatically
+- release builds include commit-count and short-SHA metadata in `InformationalVersion`
+- use the **Cut Release Tag** workflow in GitHub Actions to calculate and push the next tag
 
 When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
 

@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -45,6 +47,8 @@ jobs:
           $packageVersion = $tag.Substring(1)
           $numericVersion = $packageVersion -replace '[-+].*$', ''
           $parts = $numericVersion.Split('.')
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $commitCount = (git rev-list --count "${{ github.sha }}").Trim()
 
           if ($parts.Length -eq 3) {
             $assemblyVersion = "$numericVersion.0"
@@ -56,9 +60,10 @@ jobs:
             throw "Tag '$tag' must map to a version with 3 or 4 numeric components, for example v1.2.3 or v1.2.3-beta.1."
           }
 
+          $informationalVersion = "$tag+build.$commitCount.sha.$shortSha"
           "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "ASSEMBLY_VERSION=$assemblyVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "INFORMATIONAL_VERSION=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INFORMATIONAL_VERSION=$informationalVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Publish ${{ matrix.rid }}
         shell: pwsh
@@ -108,5 +113,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: release-assets/*
           fail_on_unmatched_files: true
