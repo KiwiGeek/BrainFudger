@@ -191,16 +191,16 @@ Mach-O has a special talent for failing in ways that feel personal.
 After copying the file over:
 
 ```bash
-chmod +x ./hello.macho
-codesign -s - -f ./hello.macho
-./hello.macho
+chmod +x ./hello
+codesign -s - -f ./hello
+./hello
 ```
 
 Useful inspection commands:
 
 ```bash
-codesign -dvvv ./hello.macho
-otool -l ./hello.macho
+codesign -dvvv ./hello
+otool -l ./hello
 ```
 
 If `otool` complains about inconsistent command sizes or segment math, fix the file first. Code signing cannot save a binary whose structure is already wrong.
