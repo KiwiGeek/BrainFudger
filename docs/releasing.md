@@ -56,6 +56,7 @@ How it behaves:
 - if `base_version` is supplied, the workflow uses that release line directly instead of bumping from the latest stable tag
 
 The workflow pushes the tag for you. That tag push then triggers the normal release build workflow.
+Because the tag is created by GitHub Actions, the workflow also explicitly dispatches the build-and-release workflow after pushing the tag.
 
 ## Typical Flows
 
@@ -107,4 +108,6 @@ Example result: `v1.5.0`
 
 - prerelease tags become GitHub prereleases automatically
 - final tags become normal GitHub releases automatically
-- the release workflow builds all supported host artifacts and uploads them to the GitHub Release
+- the release workflow builds all supported host artifacts and uploads the raw binaries directly to the GitHub Release
+- Windows assets download as `.exe` files directly
+- macOS assets download as raw Mach-O files; after downloading on macOS, run `chmod +x ./BrainFudger-osx-...` before executing them
