@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BrainFudger GUI",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build BrainFudger",
+      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "BrainFudger CLI Help",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build BrainFudger",
+      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "args": [
+        "--help"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "BrainFudger CLI Sample",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build BrainFudger",
+      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "args": [
+        ".\\bf_source\\hello.bf",
+        "-o",
+        ".\\hello.exe",
+        "--target",
+        "win-x64"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}

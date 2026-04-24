@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="NuGet.Config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/bf_source/">
+    <File Path="bf_source/add.bf" />
+    <File Path="bf_source/advanced-test.bf" />
+    <File Path="bf_source/beer.bf" />
+    <File Path="bf_source/hello.bf" />
+    <File Path="bf_source/name-insult.bf" />
+  </Folder>
+  <Project Path="BrainFudger/BrainFudger.csproj" />
+</Solution>

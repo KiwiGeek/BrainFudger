@@ -1,17 +1,18 @@
-#if BRAINFUCKER_WINDOWS_GUI
+#if WINDOWS
 using System.Runtime.InteropServices;
 using System.Text;
 using BrainFudger.Emitters;
 using BrainFudger.Models;
 using BrainFudger.Services;
 
-namespace BrainFudger;
+namespace BrainFudger.Gui;
 
-internal sealed class WindowsGuiApplication
+internal sealed class WindowsGuiApplication : IGuiApplicationHost
 {
     private const string WindowClassName = "BrainFudgerWindowsGui";
     private const string WindowTitle = "BrainFudger";
     private const uint WindowMessageBuildCompleted = NativeMethods.WM_APP + 1;
+    private const string GuiHostArgument = "--gui-host";
 
     private const int ControlIdInputEdit = 1001;
     private const int ControlIdInputBrowse = 1002;
@@ -45,15 +46,41 @@ internal sealed class WindowsGuiApplication
     private CompilationExecutionResult? _pendingExecutionResult;
     private Exception? _pendingException;
 
-    public static bool IsSupported => OperatingSystem.IsWindows();
+    public static WindowsGuiApplication Instance { get; } = new();
 
-    public static int Run()
+    public bool TryHandleHostArguments(string[] args, out int exitCode)
     {
-        if (!IsSupported)
+        if (args.Any(static arg => string.Equals(arg, GuiHostArgument, StringComparison.OrdinalIgnoreCase)))
         {
-            return 1;
+            exitCode = Run();
+            return true;
         }
 
+        exitCode = 0;
+        return false;
+    }
+
+    public bool ShouldLaunchDetached()
+    {
+        nint consoleWindow = NativeMethods.GetConsoleWindow();
+        return consoleWindow != 0 && !NativeMethods.IsOwnConsoleWindow();
+    }
+
+    public int LaunchDetached()
+    {
+        string executablePath = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Could not determine the BrainFudger executable path.");
+
+        if (!WindowsProcessHost.TryLaunchDetached(executablePath, GuiHostArgument, Environment.CurrentDirectory))
+        {
+            throw new InvalidOperationException("Could not launch the BrainFudger GUI window.");
+        }
+
+        return 0;
+    }
+
+    public int Run()
+    {
         nint consoleWindow = NativeMethods.GetConsoleWindow();
         if (consoleWindow != 0 && NativeMethods.IsOwnConsoleWindow())
         {
@@ -69,17 +96,6 @@ internal sealed class WindowsGuiApplication
             NativeMethods.MessageBox(0, ex.Message, WindowTitle, NativeMethods.MB_ICONERROR | NativeMethods.MB_OK);
             return 1;
         }
-    }
-
-    public static bool ShouldLaunchDetached()
-    {
-        if (!IsSupported)
-        {
-            return false;
-        }
-
-        nint consoleWindow = NativeMethods.GetConsoleWindow();
-        return consoleWindow != 0 && !NativeMethods.IsOwnConsoleWindow();
     }
 
     private WindowsGuiApplication()
@@ -1058,6 +1074,105 @@ internal sealed class WindowsGuiApplication
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern uint GetConsoleProcessList(ref uint processList, uint processCount);
+    }
+
+    private static class WindowsProcessHost
+    {
+        private const uint DetachedProcess = 0x00000008;
+        private const uint NewProcessGroup = 0x00000200;
+
+        public static bool TryLaunchDetached(string executablePath, string argument, string workingDirectory)
+        {
+            string commandLine = $"\"{executablePath}\" {argument}";
+            StartupInfo startupInfo = new()
+            {
+                cb = (uint)Marshal.SizeOf<StartupInfo>()
+            };
+
+            bool created = CreateProcess(
+                lpApplicationName: executablePath,
+                lpCommandLine: commandLine,
+                lpProcessAttributes: nint.Zero,
+                lpThreadAttributes: nint.Zero,
+                bInheritHandles: false,
+                dwCreationFlags: DetachedProcess | NewProcessGroup,
+                lpEnvironment: nint.Zero,
+                lpCurrentDirectory: workingDirectory,
+                lpStartupInfo: ref startupInfo,
+                lpProcessInformation: out ProcessInformation processInformation);
+
+            if (!created)
+            {
+                return false;
+            }
+
+            try
+            {
+                return true;
+            }
+            finally
+            {
+                if (processInformation.hThread != 0)
+                {
+                    CloseHandle(processInformation.hThread);
+                }
+
+                if (processInformation.hProcess != 0)
+                {
+                    CloseHandle(processInformation.hProcess);
+                }
+            }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreateProcess(
+            string lpApplicationName,
+            string lpCommandLine,
+            nint lpProcessAttributes,
+            nint lpThreadAttributes,
+            [MarshalAs(UnmanagedType.Bool)] bool bInheritHandles,
+            uint dwCreationFlags,
+            nint lpEnvironment,
+            string lpCurrentDirectory,
+            ref StartupInfo lpStartupInfo,
+            out ProcessInformation lpProcessInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(nint hObject);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct StartupInfo
+        {
+            public uint cb;
+            public string? lpReserved;
+            public string? lpDesktop;
+            public string? lpTitle;
+            public uint dwX;
+            public uint dwY;
+            public uint dwXSize;
+            public uint dwYSize;
+            public uint dwXCountChars;
+            public uint dwYCountChars;
+            public uint dwFillAttribute;
+            public uint dwFlags;
+            public ushort wShowWindow;
+            public ushort cbReserved2;
+            public nint lpReserved2;
+            public nint hStdInput;
+            public nint hStdOutput;
+            public nint hStdError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ProcessInformation
+        {
+            public nint hProcess;
+            public nint hThread;
+            public uint dwProcessId;
+            public uint dwThreadId;
+        }
     }
 }
 #endif

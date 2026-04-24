@@ -4,6 +4,12 @@
 
 If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainfuck itself plus the executable formats this project emits.
 
+The app stays as a single project, with compiler-gated platform GUI hosts:
+
+- the CLI remains the default interactive surface
+- a native Win32 GUI host is compiled in on Windows
+- a native AppKit GUI host is compiled in on macOS
+
 ## What it does
 
 - reads a Brainfuck source file
@@ -34,7 +40,7 @@ BrainFudger.exe .\bf_source\hello.bf -o hello-dos.exe --target msdos-exe
 ```
 
 ```powershell
-BrainFudger.exe .\bf_source\hello.bf -o hello.macho --target osx-arm64
+BrainFudger.exe .\bf_source\hello.bf -o hello --target osx-arm64
 ```
 
 ```powershell
@@ -53,6 +59,8 @@ dotnet publish -c Release
 
 When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
 
+On macOS, the AppKit host provides a native window with source/output pickers, target selection, cells input, and Build/Run buttons wired through the same compilation workflow as the CLI.
+
 ## Options
 
 - `-o`, `--output`: desired output binary path
@@ -70,7 +78,7 @@ When built on Windows, MSBuild defines the GUI compile symbol automatically, so 
 | `win-x86` | `.exe` | Windows PE x86 | ✅ | ✅ | ❌ |
 | `msdos-com` | `.com` | MS-DOS 16-bit COM | ❌ | ❌ | ❌ |
 | `msdos-exe` | `.exe` | MS-DOS 16-bit EXE | ❌ | ❌ | ❌ |
-| `osx-arm64` | `.macho` | macOS Apple Silicon Mach-O | ❌ | ❌ | ✅ |
+| `osx-arm64` | none | macOS Apple Silicon Mach-O | ❌ | ❌ | ✅ |
 
 ## MS-DOS targets
 
@@ -84,6 +92,6 @@ The DOS targets emit 16-bit binaries intended for MS-DOS 5.0-style environments.
 The `osx-arm64` target emits a 64-bit Mach-O executable for Apple Silicon Macs.
 
 - `--run` is only allowed on macOS arm64 hosts
-- the generated file defaults to a `.macho` extension, but you can name it however you like
+- the generated file defaults to no extension, but you can still provide any output name you like
 - future work will likely add `osx-x64` and a universal/fat binary wrapper
 - See [docs/mach-o-arm64.md](./docs/mach-o-arm64.md) for the low-level format breakdown
