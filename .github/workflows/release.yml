@@ -1,0 +1,119 @@
+name: Build And Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            runner: windows-latest
+          - rid: win-x86
+            runner: windows-latest
+          - rid: osx-arm64
+            runner: macos-latest
+          - rid: osx-x64
+            runner: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Derive version from tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag.StartsWith('v')) {
+            throw "Expected a v-prefixed tag, got '$tag'."
+          }
+
+          $packageVersion = $tag.Substring(1)
+          $numericVersion = $packageVersion -replace '[-+].*$', ''
+          $parts = $numericVersion.Split('.')
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $commitCount = (git rev-list --count "${{ github.sha }}").Trim()
+
+          if ($parts.Length -eq 3) {
+            $assemblyVersion = "$numericVersion.0"
+          }
+          elseif ($parts.Length -eq 4) {
+            $assemblyVersion = $numericVersion
+          }
+          else {
+            throw "Tag '$tag' must map to a version with 3 or 4 numeric components, for example v1.2.3 or v1.2.3-beta.1."
+          }
+
+          $informationalVersion = "$tag+build.$commitCount.sha.$shortSha"
+          "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASSEMBLY_VERSION=$assemblyVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "INFORMATIONAL_VERSION=$informationalVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Publish ${{ matrix.rid }}
+        shell: pwsh
+        run: >
+          dotnet publish .\BrainFudger\BrainFudger.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:Version="$env:PACKAGE_VERSION"
+          -p:AssemblyVersion="$env:ASSEMBLY_VERSION"
+          -p:FileVersion="$env:ASSEMBLY_VERSION"
+          -p:InformationalVersion="$env:INFORMATIONAL_VERSION"
+          -p:IncludeSourceRevisionInInformationalVersion=false
+          -o "$env:RUNNER_TEMP/publish/${{ matrix.rid }}"
+
+      - name: Package ${{ matrix.rid }}
+        shell: pwsh
+        run: |
+          $assetName = "BrainFudger-${{ matrix.rid }}-${{ github.ref_name }}.zip"
+          $publishPath = Join-Path $env:RUNNER_TEMP "publish/${{ matrix.rid }}"
+          $assetPath = Join-Path $env:RUNNER_TEMP $assetName
+          Compress-Archive -Path (Join-Path $publishPath '*') -DestinationPath $assetPath
+          "ASSET_PATH=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.rid }}
+          path: ${{ env.ASSET_PATH }}
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: release-assets/*
+          fail_on_unmatched_files: true

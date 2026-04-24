@@ -6,7 +6,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build BrainFudger",
-      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "program": "${workspaceFolder}/BrainFudger/bin/Debug/net10.0/BrainFudger.dll",
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",
       "stopAtEntry": false
@@ -16,7 +16,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build BrainFudger",
-      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "program": "${workspaceFolder}/BrainFudger/bin/Debug/net10.0/BrainFudger.dll",
       "args": [
         "--help"
       ],
@@ -29,13 +29,11 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build BrainFudger",
-      "program": "${workspaceFolder}/bin/Debug/net10.0/win-x64/BrainFudger.dll",
+      "program": "${workspaceFolder}/BrainFudger/bin/Debug/net10.0/BrainFudger.dll",
       "args": [
-        ".\\bf_source\\hello.bf",
+        "bf_source/hello.bf",
         "-o",
-        ".\\hello.exe",
-        "--target",
-        "win-x64"
+        "hello"
       ],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",

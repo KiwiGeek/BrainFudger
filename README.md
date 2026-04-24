@@ -57,6 +57,19 @@ To publish:
 dotnet publish -c Release
 ```
 
+## Releases
+
+Release notes live in [docs/releasing.md](./docs/releasing.md).
+
+Short version:
+
+- use semantic tags like `v1.2.3`, `v1.3.0-alpha.1`, or `v2.0.0-rc.1`
+- only `v*` tags trigger the GitHub release workflow
+- `bugfix` bumps patch, `feature` bumps minor, `breaking` bumps major
+- prerelease tags become GitHub prereleases automatically
+- release builds include commit-count and short-SHA metadata in `InformationalVersion`
+- use the **Cut Release Tag** workflow in GitHub Actions to calculate and push the next tag
+
 When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
 
 On macOS, the AppKit host provides a native window with source/output pickers, target selection, cells input, and Build/Run buttons wired through the same compilation workflow as the CLI.
