@@ -25,7 +25,7 @@ public static class CompilationWorkflow
         IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
         string outputPath = run
             ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)
-            : (output?.FullName ?? Path.GetFullPath(Path.ChangeExtension(inputPath, emitter.DefaultFileExtension)));
+            : (output?.FullName ?? Path.GetFullPath(CreateDefaultOutputPath(inputPath, emitter.DefaultFileExtension)));
 
         return new CompilerOptions
         {
@@ -67,7 +67,7 @@ public static class CompilationWorkflow
         string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, preparedCompilation.Binary);
-        preparedCompilation.Emitter.PrepareFileForExecution(outputPath);
+        await FinalizeBuiltBinaryAsync(preparedCompilation, outputPath);
 
         return new CompilationExecutionResult(0, outputPath, preparedCompilation.Emitter.DisplayName, RanBinary: false);
     }
@@ -78,7 +78,7 @@ public static class CompilationWorkflow
         string outputDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
         await File.WriteAllBytesAsync(outputPath, preparedCompilation.Binary);
-        preparedCompilation.Emitter.PrepareFileForExecution(outputPath);
+        await FinalizeBuiltBinaryAsync(preparedCompilation, outputPath);
 
         try
         {
@@ -108,8 +108,65 @@ public static class CompilationWorkflow
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "BrainFudger");
         string tempDirectory = Path.Combine(tempRoot, Guid.NewGuid().ToString("N"));
-        string fileName = $"{Path.GetFileNameWithoutExtension(inputPath)}{extension}";
+        string fileName = Path.GetFileName(CreateDefaultOutputPath(inputPath, extension));
         return Path.Combine(tempDirectory, fileName);
+    }
+
+    private static string CreateDefaultOutputPath(string inputPath, string extension)
+    {
+        string directory = Path.GetDirectoryName(inputPath) ?? Directory.GetCurrentDirectory();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(inputPath);
+        return Path.Combine(directory, fileNameWithoutExtension + extension);
+    }
+
+    private static async Task FinalizeBuiltBinaryAsync(PreparedCompilation preparedCompilation, string outputPath)
+    {
+        preparedCompilation.Emitter.PrepareFileForExecution(outputPath);
+
+        if (!OperatingSystem.IsMacOS() || !string.Equals(preparedCompilation.Emitter.TargetId, "osx-arm64", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        const string codeSignPath = "/usr/bin/codesign";
+        if (!File.Exists(codeSignPath))
+        {
+            return;
+        }
+
+        using Process process = new();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = codeSignPath,
+            WorkingDirectory = Path.GetDirectoryName(outputPath) ?? Directory.GetCurrentDirectory(),
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        };
+
+        process.StartInfo.ArgumentList.Add("--force");
+        process.StartInfo.ArgumentList.Add("--sign");
+        process.StartInfo.ArgumentList.Add("-");
+        process.StartInfo.ArgumentList.Add("--timestamp=none");
+        process.StartInfo.ArgumentList.Add(outputPath);
+
+        process.Start();
+        string standardOutput = await process.StandardOutput.ReadToEndAsync();
+        string standardError = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode == 0)
+        {
+            return;
+        }
+
+        string errorDetails = string.Join(
+            Environment.NewLine,
+            new[] { standardError.Trim(), standardOutput.Trim() }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(errorDetails)
+                ? $"codesign failed for '{outputPath}' with exit code {process.ExitCode}."
+                : $"codesign failed for '{outputPath}' with exit code {process.ExitCode}:{Environment.NewLine}{errorDetails}");
     }
 
     private static ProcessStartInfo CreatePausedRunStartInfo(CompilerOptions options, string outputPath)
