@@ -4,12 +4,12 @@ Welcome to the cursed library.
 
 This folder has two jobs:
 
-1. explain Brainfuck itself clearly enough that somebody can read or write it without vibes-only guessing
+1. explain Brainf$#k itself clearly enough that somebody can read or write it without vibes-only guessing
 2. explain the executable formats BrainFudger emits well enough that you could hand-craft a working binary with a hex editor, patience, and the correct amount of spite
 
 ## Reading Order
 
-- [Brainfuck Language](./brainfuck-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
+- [Brainf$#k Language](./brainf$#k-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
 - [Executable Fundamentals](./executable-fundamentals.md): the general mental model for turning bytes into runnable programs
 - [PE32 for Win x86](./pe32-x86.md): 32-bit Windows executables
 - [PE32+ for Win x64](./pe32-plus-x64.md): 64-bit Windows executables
@@ -28,7 +28,7 @@ If you want to craft an executable by hand, you need to think in layers:
 - loader expectations
 - OS services for I/O, process exit, and imports
 
-That stack is the whole game. BrainFudger happens to automate it for Brainfuck, but the docs are written to be useful even if your payload is not Brainfuck at all.
+That stack is the whole game. BrainFudger happens to automate it for Brainf$#k, but the docs are written to be useful even if your payload is not Brainf$#k at all.
 
 ## Format Coverage
 

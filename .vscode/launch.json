@@ -12,6 +12,26 @@
       "stopAtEntry": false
     },
     {
+      "name": "BrainFucker GUI",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build BrainFucker",
+      "program": "${workspaceFolder}/BrainFudger/bin/Debug/net10.0/BrainFucker.dll",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "BrainFux0r GUI",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build BrainFux0r",
+      "program": "${workspaceFolder}/BrainFudger/bin/Debug/net10.0/BrainFux0r.dll",
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
       "name": "BrainFudger CLI Help",
       "type": "coreclr",
       "request": "launch",

@@ -97,7 +97,7 @@ internal static class Program
     {
         Argument<FileInfo> inputArgument = new("input")
         {
-            Description = "Path to the Brainfuck source file."
+            Description = Branding.SourceFileDescription
         };
 
         Option<FileInfo?> outputOption = new("--output", "-o")
@@ -140,7 +140,7 @@ internal static class Program
             }
         });
 
-        RootCommand command = new("Compile Brainfuck source into a native executable.")
+        RootCommand command = new(Branding.SourceCompilationDescription)
         {
             inputArgument,
             outputOption,
@@ -199,7 +199,7 @@ internal static class Program
                 await AnsiConsole.Status()
                     .Spinner(Spinner.Known.Dots)
                     .SpinnerStyle(Style.Parse("deepskyblue2"))
-                    .StartAsync("Compiling brainfuck source...", async _ =>
+                    .StartAsync(Branding.SourceCompilationProgress, async _ =>
                     {
                         preparedCompilation = await CompilationWorkflow.PrepareAsync(options);
                     });
@@ -234,12 +234,12 @@ internal static class Program
             return;
         }
 
-        AnsiConsole.Write(new FigletText("BrainFudger").Color(Color.DeepSkyBlue2));
-        AnsiConsole.Write(new Markup("[grey]Compile Brainfuck source into a native executable.[/]\n\n"));
+        AnsiConsole.Write(new FigletText(Branding.AppDisplayName).Color(Color.DeepSkyBlue2));
+        AnsiConsole.Write(new Markup($"[grey]{Markup.Escape(Branding.SourceCompilationDescription)}[/]\n\n"));
 
         Table usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
-            $"[white]brainfudger[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
+            $"[white]{Markup.Escape(Branding.CommandName)}[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
             $"[blue]{Markup.Escape("[-o output.exe|output.com|output]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
@@ -250,7 +250,7 @@ internal static class Program
         AnsiConsole.WriteLine();
 
         Table options = new Table().RoundedBorder().AddColumns("[aqua]Option[/]", "[aqua]Description[/]");
-        options.AddRow("[yellow]<input>[/]", "Path to the Brainfuck source file.");
+        options.AddRow("[yellow]<input>[/]", Branding.SourceFileDescription);
 #if WINDOWS
         options.AddRow("[grey](no arguments)[/]", "Launch the native GUI file picker instead of the CLI error panel.");
 #endif
@@ -364,14 +364,14 @@ internal static class Program
 
     private static void RenderHelpPlainText()
     {
-        Console.WriteLine("BrainFudger");
-        Console.WriteLine("Compile Brainfuck source into a native executable.");
+        Console.WriteLine(Branding.AppDisplayName);
+        Console.WriteLine(Branding.SourceCompilationDescription);
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  brainfudger <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
+        Console.WriteLine($"  {Branding.CommandName} <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  <input>           Path to the Brainfuck source file.");
+        Console.WriteLine($"  <input>           {Branding.SourceFileDescription}");
 #if WINDOWS || APPLEOSX
         Console.WriteLine("  (no arguments)    Launch the native GUI file picker instead of the CLI error panel.");
 #endif

@@ -9,7 +9,6 @@ namespace BrainFudger;
 
 internal sealed class MacGuiApplication : IGuiApplicationHost
 {
-    private const string WindowTitle = "BrainFudger";
     private const nuint ActivationPolicyRegular = 0;
     private const nuint WindowStyleMaskTitled = 1;
     private const nuint WindowStyleMaskClosable = 2;
@@ -79,7 +78,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         }
         catch (Exception ex)
         {
-            ShowAlert("BrainFudger Mac GUI Failed", ex.Message, critical: true);
+            ShowAlert($"{Branding.AppDisplayName} Mac GUI Failed", ex.Message, critical: true);
             return 1;
         }
         finally
@@ -104,12 +103,12 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
             BackingStoreBuffered,
             false);
 
-        Cocoa.SendVoid(_window, "setTitle:", Cocoa.ToNSString(WindowTitle));
+        Cocoa.SendVoid(_window, "setTitle:", Cocoa.ToNSString(Branding.AppDisplayName));
         Cocoa.SendVoid(_window, "center");
 
         nint contentView = Cocoa.SendIntPtr(_window, "contentView");
 
-        AddLabel(contentView, "Brainfuck source", new NSRect(20, 300, 140, 24));
+        AddLabel(contentView, $"{Branding.LanguageDisplayName} source", new NSRect(20, 300, 140, 24));
         _inputField = AddTextField(contentView, new NSRect(20, 270, 560, 28), editable: true);
         AddButton(contentView, "Browse…", new NSRect(600, 268, 120, 32), "browseInput:");
 
@@ -228,7 +227,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
             string inputPath = GetControlText(_inputField).Trim();
             if (string.IsNullOrWhiteSpace(inputPath))
             {
-                ShowAlert("No source file selected", "Choose a Brainfuck source file first.", critical: false);
+                ShowAlert("No source file selected", $"Choose a {Branding.LanguageDisplayName} source file first.", critical: false);
                 return;
             }
 

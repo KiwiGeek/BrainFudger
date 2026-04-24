@@ -26,8 +26,8 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        DosProgramImage program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
-        return DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, ComOrigin);
+        DosProgramImage program = DosBrainFudgerEmitter.EmitProgramImage(sanitizedSource, options);
+        return DosBrainFudgerEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, ComOrigin);
     }
 }
 
@@ -53,13 +53,13 @@ internal sealed class MsDosExeEmitter : IBinaryEmitter
 
     public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
     {
-        DosProgramImage program = DosBrainfuckEmitter.EmitProgramImage(sanitizedSource, options);
-        byte[] imageBytes = DosBrainfuckEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
+        DosProgramImage program = DosBrainFudgerEmitter.EmitProgramImage(sanitizedSource, options);
+        byte[] imageBytes = DosBrainFudgerEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
         return DosMzExecutableWriter.WriteExecutable(imageBytes, StackSize);
     }
 }
 
-internal static class DosBrainfuckEmitter
+internal static class DosBrainFudgerEmitter
 {
     public static DosProgramImage EmitProgramImage(string sanitizedSource, CompilerOptions options)
     {

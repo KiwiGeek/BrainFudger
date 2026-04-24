@@ -1,10 +1,8 @@
 # BrainFudger
 
-`BrainFudger` is a C# Brainfuck compiler with pluggable binary emitters. It currently ships with Win32 x64, Win32 x86, MS-DOS `.COM`, MS-DOS `MZ .EXE`, and macOS Apple Silicon Mach-O backends.
+`BrainFudger` is a C# Brainf$#k compiler with pluggable binary emitters. It currently ships with Win32 x64, Win32 x86, MS-DOS `.COM`, MS-DOS `MZ .EXE`, and macOS Apple Silicon Mach-O backends.
 
-If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainfuck itself plus the executable formats this project emits.
-
-The app stays as a single project, with compiler-gated platform GUI hosts:
+If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainf$#k itself plus the executable formats this project emits.
 
 - the CLI remains the default interactive surface
 - a native Win32 GUI host is compiled in on Windows
@@ -12,7 +10,7 @@ The app stays as a single project, with compiler-gated platform GUI hosts:
 
 ## What it does
 
-- reads a Brainfuck source file
+- reads a Brainf$#k source file
 - validates matching loop brackets
 - generates a valid native executable
 - generates tape bounds checks so invalid pointer moves fail with an error
@@ -57,22 +55,15 @@ To publish:
 dotnet publish -c Release
 ```
 
-## Releases
+Alternate branding builds:
 
-Release notes live in [docs/releasing.md](./docs/releasing.md).
+```powershell
+dotnet build -p:BrandingDirective=IAMGARYPENN
+```
 
-Short version:
-
-- use semantic tags like `v1.2.3`, `v1.3.0-alpha.1`, or `v2.0.0-rc.1`
-- only `v*` tags trigger the GitHub release workflow
-- `bugfix` bumps patch, `feature` bumps minor, `breaking` bumps major
-- prerelease tags become GitHub prereleases automatically
-- release builds include commit-count and short-SHA metadata in `InformationalVersion`
-- use the **Cut Release Tag** workflow in GitHub Actions to calculate and push the next tag
-
-When built on Windows, MSBuild defines the GUI compile symbol automatically, so launching `BrainFudger.exe` without parameters opens the native file-picker GUI. Parameterized launches continue to use the CLI.
-
-On macOS, the AppKit host provides a native window with source/output pickers, target selection, cells input, and Build/Run buttons wired through the same compilation workflow as the CLI.
+```powershell
+dotnet build -p:BrandingDirective=ZEROCOOL
+```
 
 ## Options
 
@@ -108,3 +99,14 @@ The `osx-arm64` target emits a 64-bit Mach-O executable for Apple Silicon Macs.
 - the generated file defaults to no extension, but you can still provide any output name you like
 - future work will likely add `osx-x64` and a universal/fat binary wrapper
 - See [docs/mach-o-arm64.md](./docs/mach-o-arm64.md) for the low-level format breakdown
+
+## The Elephant
+
+Yes, this is the part where a professional developer admits the README had an elephant in it.
+
+The default build ships with censored public-facing wording. If you want to uncensor it at compile time, there are two opt-in switches:
+
+- `ZEROCOOL`: swaps the public branding to `BrainFux0r` and the language name to `BrainFux`
+- `IAMGARYPENN`: removes all censoring on the branding, and refers to the language by its official name. Extra points if you get the reference. If you google it, you did not get the reference.
+
+Do not enable both at once.

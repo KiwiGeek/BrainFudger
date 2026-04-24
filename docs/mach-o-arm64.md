@@ -137,7 +137,7 @@ Standard descriptors are the usual Unix ones:
 
 The data section contains:
 
-- the Brainfuck tape
+- the Brainf$#k tape
 - `tape_end`
 - pointer-before-start message
 - pointer-past-end message
@@ -205,9 +205,9 @@ otool -l ./hello
 
 If `otool` complains about inconsistent command sizes or segment math, fix the file first. Code signing cannot save a binary whose structure is already wrong.
 
-## Why This Matters Beyond Brainfuck
+## Why This Matters Beyond Brainf$#k
 
-None of this is Brainfuck-specific. Swap the payload out for any other ARM64 code and the container rules stay the same:
+None of this is Brainf$#k-specific. Swap the payload out for any other ARM64 code and the container rules stay the same:
 
 - identify the file correctly
 - describe the mapped image coherently

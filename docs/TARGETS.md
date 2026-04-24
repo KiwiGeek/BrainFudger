@@ -159,7 +159,7 @@ This document tracks current targets and planned expansions, primarily focused o
 
 ## End Goal
 
-A Brainfuck compiler capable of targeting executable formats across the historical spectrum of the DOS/Windows ecosystem, including:
+A Brainf$#k compiler capable of targeting executable formats across the historical spectrum of the DOS/Windows ecosystem, including:
 
 - real mode
 - protected mode
