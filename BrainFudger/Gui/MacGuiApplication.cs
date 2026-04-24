@@ -1,6 +1,7 @@
 #if APPLEOSX
 using System.Runtime.InteropServices;
 using BrainFudger.Emitters;
+using BrainFudger.Gui;
 using BrainFudger.Models;
 using BrainFudger.Services;
 
@@ -56,6 +57,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
 
     private int RunApplication()
     {
+        Cocoa.EnsureFrameworksLoaded();
         nint pool = Cocoa.SendIntPtr(Cocoa.GetClass("NSAutoreleasePool"), "new");
 
         try
@@ -199,6 +201,22 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         RefreshDerivedOutputPath(force: false);
     }
 
+    private void HandleControlTextChanged(nint notification)
+    {
+        nint control = Cocoa.SendIntPtr(notification, "object");
+        if (control == _inputField)
+        {
+            _outputPathWasEdited = false;
+            RefreshDerivedOutputPath(force: true);
+            return;
+        }
+
+        if (control == _outputField)
+        {
+            _outputPathWasEdited = true;
+        }
+    }
+
     private void BuildBinary() => BuildOrRun(run: false);
 
     private void RunBinary() => BuildOrRun(run: true);
@@ -284,7 +302,9 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         }
 
         IBinaryEmitter emitter = GetSelectedEmitter();
-        string derivedPath = Path.ChangeExtension(inputPath, emitter.DefaultFileExtension) ?? inputPath + emitter.DefaultFileExtension;
+        string directory = Path.GetDirectoryName(inputPath) ?? Directory.GetCurrentDirectory();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(inputPath);
+        string derivedPath = Path.Combine(directory, fileNameWithoutExtension + emitter.DefaultFileExtension);
         SetOutputPath(derivedPath, markAsEdited: false);
     }
 
@@ -335,6 +355,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         Cocoa.AddMethod(actionClass, "browseInput:", Cocoa.BrowseInputCallback, "v@:@");
         Cocoa.AddMethod(actionClass, "browseOutput:", Cocoa.BrowseOutputCallback, "v@:@");
         Cocoa.AddMethod(actionClass, "targetChanged:", Cocoa.TargetChangedCallback, "v@:@");
+        Cocoa.AddMethod(actionClass, "controlTextDidChange:", Cocoa.ControlTextDidChangeCallback, "v@:@");
         Cocoa.AddMethod(actionClass, "buildBinary:", Cocoa.BuildBinaryCallback, "v@:@");
         Cocoa.AddMethod(actionClass, "runBinary:", Cocoa.RunBinaryCallback, "v@:@");
         Cocoa.AddMethod(actionClass, "applicationShouldTerminateAfterLastWindowClosed:", Cocoa.CloseAfterLastWindowCallback, "c@:@");
@@ -362,6 +383,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         Cocoa.SendVoid(field, "setBezeled:", bordered);
         Cocoa.SendVoid(field, "setBordered:", bordered);
         Cocoa.SendVoid(field, "setDrawsBackground:", drawBackground);
+        Cocoa.SendVoid(field, "setDelegate:", _actionTarget);
         Cocoa.SendVoid(parent, "addSubview:", field);
         return field;
     }
@@ -437,17 +459,36 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
     private static class Cocoa
     {
         public const string ActionTargetClassName = "BrainFudgerMacActionTarget";
+        private const int RtldNow = 0x2;
+        private const int RtldGlobal = 0x8;
+        private const string FoundationFrameworkPath = "/System/Library/Frameworks/Foundation.framework/Foundation";
+        private const string AppKitFrameworkPath = "/System/Library/Frameworks/AppKit.framework/AppKit";
+
         public static nint ActionTargetClass;
 
         public static readonly ObjcAction BrowseInputCallback = BrowseInput;
         public static readonly ObjcAction BrowseOutputCallback = BrowseOutput;
         public static readonly ObjcAction TargetChangedCallback = TargetChanged;
+        public static readonly ObjcAction ControlTextDidChangeCallback = ControlTextDidChange;
         public static readonly ObjcAction BuildBinaryCallback = BuildBinary;
         public static readonly ObjcAction RunBinaryCallback = RunBinary;
         public static readonly ObjcShouldTerminate CloseAfterLastWindowCallback = CloseAfterLastWindow;
 
         private static readonly Dictionary<string, nint> SelectorCache = [];
         private static readonly Dictionary<string, nint> ClassCache = [];
+        private static bool s_frameworksLoaded;
+
+        public static void EnsureFrameworksLoaded()
+        {
+            if (s_frameworksLoaded)
+            {
+                return;
+            }
+
+            LoadFramework(FoundationFrameworkPath);
+            LoadFramework(AppKitFrameworkPath);
+            s_frameworksLoaded = true;
+        }
 
         public static nint GetSelector(string name)
         {
@@ -468,9 +509,23 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
                 return @class;
             }
 
+            EnsureFrameworksLoaded();
             @class = objc_getClass(name);
+            if (@class == 0)
+            {
+                throw new InvalidOperationException($"Objective-C class '{name}' could not be resolved.");
+            }
+
             ClassCache[name] = @class;
             return @class;
+        }
+
+        private static void LoadFramework(string frameworkPath)
+        {
+            if (dlopen(frameworkPath, RtldNow | RtldGlobal) == 0)
+            {
+                throw new InvalidOperationException($"Could not load macOS framework '{frameworkPath}'.");
+            }
         }
 
         public static nint CreateObject(string className)
@@ -484,7 +539,14 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
 
         public static void AddMethod(nint @class, string selectorName, Delegate callback, string typeEncoding)
         {
-            if (!class_addMethod(@class, GetSelector(selectorName), Marshal.GetFunctionPointerForDelegate(callback), typeEncoding))
+            nint callbackPointer = callback switch
+            {
+                ObjcAction objcAction => Marshal.GetFunctionPointerForDelegate(objcAction),
+                ObjcShouldTerminate shouldTerminate => Marshal.GetFunctionPointerForDelegate(shouldTerminate),
+                _ => throw new InvalidOperationException($"Unsupported Objective-C callback type '{callback.GetType().FullName}'.")
+            };
+
+            if (!class_addMethod(@class, GetSelector(selectorName), callbackPointer, typeEncoding))
             {
                 throw new InvalidOperationException($"Could not register Objective-C method '{selectorName}'.");
             }
@@ -563,6 +625,8 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
 
         private static void TargetChanged(nint self, nint cmd, nint sender) => s_current?.HandleTargetChanged();
 
+        private static void ControlTextDidChange(nint self, nint cmd, nint sender) => s_current?.HandleControlTextChanged(sender);
+
         private static void BuildBinary(nint self, nint cmd, nint sender) => s_current?.BuildBinary();
 
         private static void RunBinary(nint self, nint cmd, nint sender) => s_current?.RunBinary();
@@ -580,6 +644,9 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
 
         [DllImport("/usr/lib/libobjc.A.dylib", CharSet = CharSet.Ansi)]
         public static extern nint sel_registerName(string selectorName);
+
+        [DllImport("/usr/lib/libSystem.B.dylib", CharSet = CharSet.Ansi)]
+        private static extern nint dlopen(string path, int mode);
 
         [DllImport("/usr/lib/libobjc.A.dylib", CharSet = CharSet.Ansi)]
         [return: MarshalAs(UnmanagedType.I1)]
