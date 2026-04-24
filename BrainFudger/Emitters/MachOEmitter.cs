@@ -12,7 +12,7 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
 
     public string DisplayName => "macOS arm64 Mach-O executable";
 
-    public string DefaultFileExtension => ".macho";
+    public string DefaultFileExtension => string.Empty;
 
     public bool CanExecuteOnCurrentPlatform(out string reason)
     {
@@ -79,7 +79,7 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         EmitErrorPath(assembler, "error_before", "pointer_before_message");
         EmitErrorPath(assembler, "error_past", "pointer_past_message");
         assembler.Label("program_exit");
-        assembler.MovImmediate64(0, 1);
+        assembler.MovImmediate64(0, 0);
         assembler.MovImmediate64(16, 1);
         assembler.Svc(0x80);
         return assembler.ToImage();
