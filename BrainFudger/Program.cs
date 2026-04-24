@@ -240,7 +240,7 @@ internal static class Program
         Table usage = new Table().Border(TableBorder.Rounded).AddColumn("[aqua]Usage[/]");
         usage.AddRow(
             $"[white]brainfudger[/] [yellow]{Markup.Escape("<input.bf>")}[/] " +
-            $"[blue]{Markup.Escape("[-o output.exe|output.com|output.macho]")}[/] " +
+            $"[blue]{Markup.Escape("[-o output.exe|output.com|output]")}[/] " +
             $"[green]{Markup.Escape("[--run]")}[/] " +
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
             $"[aqua]{Markup.Escape("[--list-targets]")}[/] " +
@@ -278,7 +278,7 @@ internal static class Program
         table.AddRow("win-x86", ".exe", "Win32 x86 PE executable");
         table.AddRow("msdos-com", ".com", "MS-DOS 16-bit COM program");
         table.AddRow("msdos-exe", ".exe", "MS-DOS 16-bit MZ executable");
-        table.AddRow("osx-arm64", ".macho", "macOS Apple Silicon Mach-O executable");
+        table.AddRow("osx-arm64", "(none)", "macOS Apple Silicon Mach-O executable");
         AnsiConsole.Write(table);
     }
 
@@ -368,7 +368,7 @@ internal static class Program
         Console.WriteLine("Compile Brainfuck source into a native executable.");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  brainfudger <input.bf> [-o output.exe|output.com|output.macho] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
+        Console.WriteLine("  brainfudger <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  <input>           Path to the Brainfuck source file.");
@@ -393,6 +393,6 @@ internal static class Program
         Console.WriteLine("  win-x86    .exe    Win32 x86 PE executable");
         Console.WriteLine("  msdos-com  .com    MS-DOS 16-bit COM program");
         Console.WriteLine("  msdos-exe  .exe    MS-DOS 16-bit MZ executable");
-        Console.WriteLine("  osx-arm64  .macho  macOS Apple Silicon Mach-O executable");
+        Console.WriteLine("  osx-arm64  (none)  macOS Apple Silicon Mach-O executable");
     }
 }
