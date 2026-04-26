@@ -11,3 +11,4 @@ publish-no-pdb/
 /.vs/
 .idea/
 *.user
+/BrainFudger/BrainFudger.csproj.user
