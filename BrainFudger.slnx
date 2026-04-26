@@ -6,6 +6,16 @@
   </Folder>
   <Folder Name="/Solution Items/docs/">
     <File Path="docs/releasing.md" />
+    <File Path="docs\brainf$#k-language.md" />
+    <File Path="docs\executable-fundamentals.md" />
+    <File Path="docs\linux-elf.md" />
+    <File Path="docs\mach-o-arm64.md" />
+    <File Path="docs\msdos-com.md" />
+    <File Path="docs\msdos-mz-exe.md" />
+    <File Path="docs\pe32-plus-x64.md" />
+    <File Path="docs\pe32-x86.md" />
+    <File Path="docs\README.md" />
+    <File Path="docs\TARGETS.md" />
   </Folder>
   <Folder Name="/Solution Items/.github/" />
   <Folder Name="/Solution Items/.github/workflows/">
