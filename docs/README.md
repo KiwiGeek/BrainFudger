@@ -9,8 +9,9 @@ This folder has two jobs:
 
 ## Reading Order
 
-- [Brainf$#k Language](./brainf$#k-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
+- [Brainf\$\#k Language](./brainf$*k-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
 - [Executable Fundamentals](./executable-fundamentals.md): the general mental model for turning bytes into runnable programs
+- [Linux ELF Executables](./linux-elf.md): syscall-only ELF targets for x86, x64, and ARM64
 - [PE32 for Win x86](./pe32-x86.md): 32-bit Windows executables
 - [PE32+ for Win x64](./pe32-plus-x64.md): 64-bit Windows executables
 - [MS-DOS `.COM`](./msdos-com.md): the tiny real-mode flat image format
@@ -32,10 +33,13 @@ That stack is the whole game. BrainFudger happens to automate it for Brainf$#k, 
 
 ## Format Coverage
 
-The project currently emits five real binary targets:
+The project currently emits eight real binary targets:
 
 | Target | Container | CPU mode | Typical host |
 | --- | --- | --- | --- |
+| `linux-x64` | ELF | x86-64 long mode | modern 64-bit Linux |
+| `linux-x86` | ELF | 32-bit x86 protected mode | 32-bit Linux, many 64-bit Linux kernels |
+| `linux-arm64` | ELF | ARM64 | modern ARM64 Linux |
 | `win-x64` | PE32+ | x86-64 long mode | modern 64-bit Windows |
 | `win-x86` | PE32 | 32-bit x86 protected mode | 32-bit Windows, WOW64, some ARM64 Windows |
 | `msdos-com` | raw `.COM` image | 16-bit x86 real mode | MS-DOS, FreeDOS, DOSBox |

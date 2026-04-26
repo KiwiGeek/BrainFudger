@@ -21,7 +21,9 @@ public static class CompilationWorkflow
         bool pauseAfterRun = false)
     {
         string inputPath = input?.FullName ?? string.Empty;
-        string resolvedTarget = string.IsNullOrWhiteSpace(target) ? "win-x64" : target;
+        string resolvedTarget = string.IsNullOrWhiteSpace(target)
+            ? BinaryEmitterRegistry.GetDefaultTargetForCurrentPlatform()
+            : target;
         IBinaryEmitter emitter = BinaryEmitterRegistry.Resolve(resolvedTarget);
         string outputPath = run
             ? CreateTemporaryOutputPath(inputPath, emitter.DefaultFileExtension)

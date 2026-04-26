@@ -92,7 +92,8 @@ internal sealed class LinuxGuiApplication : IGuiApplicationHost
             _targetCombo.AppendText(emitter.TargetId);
         }
 
-        int defaultIndex = Array.FindIndex(_emitters, static emitter => string.Equals(emitter.TargetId, "win-x64", StringComparison.OrdinalIgnoreCase));
+        string defaultTargetId = BinaryEmitterRegistry.GetDefaultTargetForCurrentPlatform();
+        int defaultIndex = Array.FindIndex(_emitters, emitter => string.Equals(emitter.TargetId, defaultTargetId, StringComparison.OrdinalIgnoreCase));
         _targetCombo.Active = defaultIndex >= 0 ? defaultIndex : 0;
         _targetCombo.Changed += (_, _) => RefreshDerivedOutputPath();
         targetColumn.PackStart(_targetCombo, expand: false, fill: false, padding: 0);

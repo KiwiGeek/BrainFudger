@@ -1189,6 +1189,8 @@ internal sealed class X86Assembler
 
     public void PushReg(X86Register register) => EmitByte((byte)(0x50 + (int)register));
 
+    public void PopReg(X86Register register) => EmitByte((byte)(0x58 + (int)register));
+
     public void MovRegImmediate32(X86Register register, int value)
     {
         EmitByte((byte)(0xB8 + (int)register));
@@ -1267,6 +1269,8 @@ internal sealed class X86Assembler
     public void CmpBytePtrEbxImmediate(byte value) => EmitBytes(0x80, 0x3B, value);
 
     public void TestEaxEax() => EmitBytes(0x85, 0xC0);
+
+    public void Int80() => EmitBytes(0xCD, 0x80);
 
     public void CmpDwordPtrLabelImmediate(string labelName, byte value)
     {
@@ -1397,6 +1401,8 @@ internal sealed class X64Assembler
     }
 
     public void TestEaxEax() => EmitBytes(0x85, 0xC0);
+
+    public void Syscall() => EmitBytes(0x0F, 0x05);
 
     public void CmpDwordRipLabelImmediate(string labelName, byte value)
     {

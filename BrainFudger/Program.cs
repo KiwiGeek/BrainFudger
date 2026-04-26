@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Text;
+using BrainFudger.Emitters;
 using BrainFudger.Models;
 using BrainFudger.Services;
 using BrainFudger.Gui;
@@ -128,8 +129,7 @@ internal static class Program
 
         Option<string> targetOption = new("--target")
         {
-            Description = "Binary emitter target identifier. Available: win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.",
-            DefaultValueFactory = static _ => "win-x64"
+            Description = "Binary emitter target identifier. Available: linux-arm64, linux-x64, linux-x86, win-x64, win-x86, msdos-com, msdos-exe, osx-arm64."
         };
 
         cellsOption.Validators.Add(static result =>
@@ -264,7 +264,7 @@ internal static class Program
         options.AddRow("[aqua]--list-targets[/]", "List the available binary targets and exit.");
         options.AddRow("[grey] [/]", "Only allowed when the selected target can run on the current host OS.");
         options.AddRow("[blue]--cells[/]", "Number of tape cells to allocate. Default: [white]30000[/].");
-        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]win-x64[/], [white]win-x86[/], [white]msdos-com[/], [white]msdos-exe[/], [white]osx-arm64[/]. Default: [white]win-x64[/].");
+        options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]linux-arm64[/], [white]linux-x64[/], [white]linux-x86[/], [white]win-x64[/], [white]win-x86[/], [white]msdos-com[/], [white]msdos-exe[/], [white]osx-arm64[/]. Default: [white]host-preferred target[/].");
         options.AddRow("[blue]-h[/], [blue]--help[/]", "Show this help screen.");
         AnsiConsole.Write(options);
     }
@@ -278,6 +278,9 @@ internal static class Program
         }
 
         Table table = new Table().RoundedBorder().AddColumns("[aqua]Target[/]", "[aqua]Output[/]", "[aqua]Description[/]");
+        table.AddRow("linux-arm64", "(none)", "Linux arm64 ELF executable");
+        table.AddRow("linux-x64", "(none)", "Linux x64 ELF executable");
+        table.AddRow("linux-x86", "(none)", "Linux x86 ELF executable");
         table.AddRow("win-x64", ".exe", "Win32 x64 PE executable");
         table.AddRow("win-x86", ".exe", "Win32 x86 PE executable");
         table.AddRow("msdos-com", ".com", "MS-DOS 16-bit COM program");
@@ -372,7 +375,7 @@ internal static class Program
         Console.WriteLine(Branding.SourceCompilationDescription);
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine($"  {Branding.CommandName} <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
+        Console.WriteLine($"  {Branding.CommandName} <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target linux-arm64|linux-x64|linux-x86|win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine($"  <input>           {Branding.SourceFileDescription}");
@@ -389,14 +392,17 @@ internal static class Program
         Console.WriteLine("  --list-targets    List the available binary targets and exit.");
         Console.WriteLine("                    Only allowed when the selected target can run on the current host OS.");
         Console.WriteLine("  --cells           Number of tape cells to allocate. Default: 30000.");
-        Console.WriteLine("  --target          Available: win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.");
-        Console.WriteLine("                    Default: win-x64.");
+        Console.WriteLine("  --target          Available: linux-arm64, linux-x64, linux-x86, win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.");
+        Console.WriteLine("                    Default: host-preferred target.");
         Console.WriteLine("  -h, --help        Show this help screen.");
     }
 
     private static void RenderTargetListPlainText()
     {
         Console.WriteLine("Available targets:");
+        Console.WriteLine("  linux-arm64 (none)  Linux arm64 ELF executable");
+        Console.WriteLine("  linux-x64   (none)  Linux x64 ELF executable");
+        Console.WriteLine("  linux-x86   (none)  Linux x86 ELF executable");
         Console.WriteLine("  win-x64    .exe    Win32 x64 PE executable");
         Console.WriteLine("  win-x86    .exe    Win32 x86 PE executable");
         Console.WriteLine("  msdos-com  .com    MS-DOS 16-bit COM program");

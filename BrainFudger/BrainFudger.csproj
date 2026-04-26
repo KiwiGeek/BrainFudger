@@ -41,6 +41,9 @@
     <Compile Remove="BrainFudger.Mac\**" />
     <EmbeddedResource Remove="BrainFudger.Mac\**" />
     <None Remove="BrainFudger.Mac\**" />
+    <Compile Remove="obj\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <None Remove="obj\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Spectre.Console" Version="0.54.0" />

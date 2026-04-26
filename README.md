@@ -1,6 +1,6 @@
 # BrainFudger
 
-`BrainFudger` is a C# Brainf$#k compiler with pluggable binary emitters. It currently ships with Win32 x64, Win32 x86, MS-DOS `.COM`, MS-DOS `MZ .EXE`, and macOS Apple Silicon Mach-O backends.
+`BrainFudger` is a C# Brainf$#k compiler with pluggable binary emitters. It currently ships with Linux x64, Linux x86, Linux arm64, Win32 x64, Win32 x86, MS-DOS `.COM`, MS-DOS `MZ .EXE`, and macOS Apple Silicon Mach-O backends.
 
 If you want the full hex-goblin tour, the new [docs index](./docs/README.md) walks through Brainf$#k itself plus the executable formats this project emits.
 
@@ -24,6 +24,18 @@ BrainFudger.exe .\bf_source\hello.bf -o hello.exe
 
 ```powershell
 BrainFudger.exe .\bf_source\hello.bf -o hello.exe --target win-x64
+```
+
+```powershell
+BrainFudger.exe .\bf_source\hello.bf -o hello-linux --target linux-x64
+```
+
+```powershell
+BrainFudger.exe .\bf_source\hello.bf -o hello-linux-x86 --target linux-x86
+```
+
+```powershell
+BrainFudger.exe .\bf_source\hello.bf -o hello-linux-arm64 --target linux-arm64
 ```
 
 ```powershell
@@ -90,17 +102,31 @@ dotnet publish -c Release -p:BrandingDirective=ZEROCOOL
 - `--quiet-run`: with `--run`, suppress CLI status/success output so only the generated program output is shown
 - `--list-targets`: list the available output targets and exit
 - `--cells <count>`: tape size, defaults to `30000`
-- `--target <id>`: output backend, currently `win-x64`, `win-x86`, `msdos-com`, `msdos-exe`, or `osx-arm64`
+- `--target <id>`: output backend, currently `linux-arm64`, `linux-x64`, `linux-x86`, `win-x64`, `win-x86`, `msdos-com`, `msdos-exe`, or `osx-arm64`
 
 ## Target matrix
 
-| Target | Output | Runtime family | `--run` win-x64 host | `--run` win-x86 host | `--run` osx-arm64 host | 
-| --- | --- | --- | --- | --- |--- |
-| `win-x64` | `.exe` | Windows PE x64 | ✅ | ❌ | ❌ |
-| `win-x86` | `.exe` | Windows PE x86 | ✅ | ✅ | ❌ |
-| `msdos-com` | `.com` | MS-DOS 16-bit COM | ❌ | ❌ | ❌ |
-| `msdos-exe` | `.exe` | MS-DOS 16-bit EXE | ❌ | ❌ | ❌ |
-| `osx-arm64` | none | macOS Apple Silicon Mach-O | ❌ | ❌ | ✅ |
+| Target | Output | Runtime family | `--run` win-x64 host | `--run` win-x86 host | `--run` linux x64 host | `--run` linux arm64 host | `--run` osx-arm64 host |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `linux-arm64` | none | Linux ELF arm64 | ❌ | ❌ | ❌ | ✅ | ❌ |
+| `linux-x64` | none | Linux ELF x64 | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `linux-x86` | none | Linux ELF x86 | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `win-x64` | `.exe` | Windows PE x64 | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `win-x86` | `.exe` | Windows PE x86 | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `msdos-com` | `.com` | MS-DOS 16-bit COM | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `msdos-exe` | `.exe` | MS-DOS 16-bit EXE | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `osx-arm64` | none | macOS Apple Silicon Mach-O | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+## Linux ELF targets
+
+The Linux targets emit static syscall-only ELF binaries.
+
+- `linux-x64`: raw x86-64 Linux syscalls
+- `linux-x86`: raw 32-bit x86 Linux syscalls
+- `linux-arm64`: raw AArch64 Linux syscalls
+- `--run` currently works when the generated target can execute on the host kernel architecture
+- generated files default to no extension
+- See [docs/linux-elf.md](./docs/linux-elf.md) for the low-level format breakdown
 
 ## MS-DOS targets
 

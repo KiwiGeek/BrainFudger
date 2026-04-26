@@ -18,6 +18,9 @@ public static class BinaryEmitterRegistry
 {
     private static readonly IBinaryEmitter[] Emitters =
     [
+        LinuxArm64ElfEmitter.Instance,
+        LinuxX64ElfEmitter.Instance,
+        LinuxX86ElfEmitter.Instance,
         MacOsArm64MachOEmitter.Instance,
         MsDosComEmitter.Instance,
         MsDosExeEmitter.Instance,
@@ -26,6 +29,34 @@ public static class BinaryEmitterRegistry
     ];
 
     public static IReadOnlyList<IBinaryEmitter> GetAll() => Emitters;
+
+    public static string GetDefaultTargetForCurrentPlatform()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.Arm64 => "linux-arm64",
+                Architecture.X86 => "linux-x86",
+                Architecture.X64 => "linux-x64",
+                _ => "linux-x64"
+            };
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) &&
+            RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        {
+            return "osx-arm64";
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X86)
+        {
+            return "win-x86";
+        }
+
+        return "win-x64";
+    }
 
     public static IBinaryEmitter Resolve(string targetId)
     {

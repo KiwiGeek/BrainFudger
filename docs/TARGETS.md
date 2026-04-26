@@ -8,6 +8,9 @@ This document tracks current targets and planned expansions, primarily focused o
 
 - [x] `win-x64` (PE32+)
 - [x] `win-x86` (PE32)
+- [x] `linux-x64` (ELF64, syscall-only)
+- [x] `linux-x86` (ELF32, syscall-only)
+- [x] `linux-arm64` (ELF64, syscall-only)
 - [x] `msdos-com` (`.COM`, real mode)
 - [x] `msdos-exe` (`MZ .EXE`, real mode)
 - [x] `osx-arm64` (Mach-O, Apple Silicon)
@@ -96,8 +99,10 @@ This document tracks current targets and planned expansions, primarily focused o
 
 ### Unix-like Systems
 
-- [ ] `linux-x64-elf`
-- [ ] `linux-x86-elf`
+- [ ] `linux-musl-x64`
+- [ ] `linux-musl-arm64`
+- [ ] `linux-pie-x64`
+- [ ] `linux-pie-arm64`
 
 ### Retro Platforms
 
