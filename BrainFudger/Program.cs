@@ -127,6 +127,26 @@ internal static class Program
             DefaultValueFactory = static _ => 30000
         };
 
+        Option<bool> enableRandomOption = new("--enable-random")
+        {
+            Description = "Enable the '?' extension command for pseudorandom byte generation."
+        };
+
+        Option<bool> enableClearOption = new("--enable-clear")
+        {
+            Description = "Enable the '!' extension command for best-effort terminal clearing."
+        };
+
+        Option<bool> enableDelayOption = new("--enable-delay")
+        {
+            Description = "Enable the '~' extension command for best-effort delay behavior."
+        };
+
+        Option<bool> enableAllExtensionsOption = new("--enable-all-extensions")
+        {
+            Description = "Enable all extension commands: ?, !, and ~."
+        };
+
         Option<string> targetOption = new("--target")
         {
             Description = "Binary emitter target identifier. Available: linux-arm64, linux-x64, linux-x86, win-x64, win-x86, msdos-com, msdos-exe, osx-arm64."
@@ -148,6 +168,10 @@ internal static class Program
             quietRunOption,
             listTargetsOption,
             cellsOption,
+            enableAllExtensionsOption,
+            enableRandomOption,
+            enableClearOption,
+            enableDelayOption,
             targetOption
         };
 
@@ -176,8 +200,21 @@ internal static class Program
             bool quietRun = parseResult.GetValue(quietRunOption);
             int cells = parseResult.GetValue(cellsOption);
             string? target = parseResult.GetValue(targetOption);
+            bool enableAllExtensions = parseResult.GetValue(enableAllExtensionsOption);
+            bool enableRandom = parseResult.GetValue(enableRandomOption);
+            bool enableClear = parseResult.GetValue(enableClearOption);
+            bool enableDelay = parseResult.GetValue(enableDelayOption);
 
-            CompilerOptions options = CompilationWorkflow.CreateCompilerOptions(input, output, run, quietRun, cells, target);
+            CompilerOptions options = CompilationWorkflow.CreateCompilerOptions(
+                input,
+                output,
+                run,
+                quietRun,
+                cells,
+                target,
+                enableRandom || enableAllExtensions,
+                enableClear || enableAllExtensions,
+                enableDelay || enableAllExtensions);
             return await ExecuteAsync(options);
         });
 
@@ -245,7 +282,11 @@ internal static class Program
             $"[grey]{Markup.Escape("[--quiet-run]")}[/] " +
             $"[aqua]{Markup.Escape("[--list-targets]")}[/] " +
             $"[blue]{Markup.Escape("[--cells 30000]")}[/] " +
-            $"[blue]{Markup.Escape("[--target win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]")}[/]");
+            $"[magenta]{Markup.Escape("[--enable-all-extensions]")}[/] " +
+            $"[magenta]{Markup.Escape("[--enable-random]")}[/] " +
+            $"[magenta]{Markup.Escape("[--enable-clear]")}[/] " +
+            $"[magenta]{Markup.Escape("[--enable-delay]")}[/] " +
+            $"[blue]{Markup.Escape("[--target linux-arm64|linux-x64|linux-x86|win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]")}[/]");
         AnsiConsole.Write(usage);
         AnsiConsole.WriteLine();
 
@@ -264,6 +305,10 @@ internal static class Program
         options.AddRow("[aqua]--list-targets[/]", "List the available binary targets and exit.");
         options.AddRow("[grey] [/]", "Only allowed when the selected target can run on the current host OS.");
         options.AddRow("[blue]--cells[/]", "Number of tape cells to allocate. Default: [white]30000[/].");
+        options.AddRow("[magenta]--enable-all-extensions[/]", "Enable all three extension commands: [white]?[/], [white]![/], and [white]~[/].");
+        options.AddRow("[magenta]--enable-random[/]", "Enable the [white]?[/] extension command for pseudorandom byte generation.");
+        options.AddRow("[magenta]--enable-clear[/]", "Enable the [white]![/] extension command for best-effort terminal clearing.");
+        options.AddRow("[magenta]--enable-delay[/]", "Enable the [white]~[/] extension command for best-effort delay behavior.");
         options.AddRow("[blue]--target[/]", "Binary emitter target identifier. Available: [white]linux-arm64[/], [white]linux-x64[/], [white]linux-x86[/], [white]win-x64[/], [white]win-x86[/], [white]msdos-com[/], [white]msdos-exe[/], [white]osx-arm64[/]. Default: [white]host-preferred target[/].");
         options.AddRow("[blue]-h[/], [blue]--help[/]", "Show this help screen.");
         AnsiConsole.Write(options);
@@ -375,7 +420,7 @@ internal static class Program
         Console.WriteLine(Branding.SourceCompilationDescription);
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine($"  {Branding.CommandName} <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--target linux-arm64|linux-x64|linux-x86|win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
+        Console.WriteLine($"  {Branding.CommandName} <input.bf> [-o output.exe|output.com|output] [--run] [--quiet-run] [--list-targets] [--cells 30000] [--enable-all-extensions] [--enable-random] [--enable-clear] [--enable-delay] [--target linux-arm64|linux-x64|linux-x86|win-x64|win-x86|msdos-com|msdos-exe|osx-arm64]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine($"  <input>           {Branding.SourceFileDescription}");
@@ -392,6 +437,11 @@ internal static class Program
         Console.WriteLine("  --list-targets    List the available binary targets and exit.");
         Console.WriteLine("                    Only allowed when the selected target can run on the current host OS.");
         Console.WriteLine("  --cells           Number of tape cells to allocate. Default: 30000.");
+        Console.WriteLine("  --enable-all-extensions");
+        Console.WriteLine("                    Enable the ?, !, and ~ extension commands together.");
+        Console.WriteLine("  --enable-random   Enable the ? extension command for pseudorandom byte generation.");
+        Console.WriteLine("  --enable-clear    Enable the ! extension command for best-effort terminal clearing.");
+        Console.WriteLine("  --enable-delay    Enable the ~ extension command for best-effort delay behavior.");
         Console.WriteLine("  --target          Available: linux-arm64, linux-x64, linux-x86, win-x64, win-x86, msdos-com, msdos-exe, osx-arm64.");
         Console.WriteLine("                    Default: host-preferred target.");
         Console.WriteLine("  -h, --help        Show this help screen.");

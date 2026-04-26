@@ -13,6 +13,7 @@ If you want the full hex-goblin tour, the new [docs index](./docs/README.md) wal
 
 - reads a Brainf$#k source file
 - validates matching loop brackets
+- lowers source into a shared intermediate opcode stream before backend code generation
 - generates a valid native executable
 - generates tape bounds checks so invalid pointer moves fail with an error
 
@@ -102,7 +103,22 @@ dotnet publish -c Release -p:BrandingDirective=ZEROCOOL
 - `--quiet-run`: with `--run`, suppress CLI status/success output so only the generated program output is shown
 - `--list-targets`: list the available output targets and exit
 - `--cells <count>`: tape size, defaults to `30000`
+- `--enable-random`: enable the `?` extension command for pseudorandom byte generation
+- `--enable-clear`: enable the `!` extension command for best-effort terminal clearing
+- `--enable-delay`: enable the `~` extension command for best-effort delay behavior
 - `--target <id>`: output backend, currently `linux-arm64`, `linux-x64`, `linux-x86`, `win-x64`, `win-x86`, `msdos-com`, `msdos-exe`, or `osx-arm64`
+
+Extension commands are disabled by default in both the CLI and GUI hosts. The GUI surfaces expose them as unchecked boxes.
+
+## Compiler pipeline
+
+The frontend now has three stages:
+
+1. filter source down to significant tokens
+2. validate loops and lower the program into a shared intermediate opcode stream
+3. hand the intermediate program to the selected emitter
+
+See [docs/intermediate-opcodes.md](./docs/intermediate-opcodes.md) for the opcode set and lowering rules.
 
 ## Target matrix
 

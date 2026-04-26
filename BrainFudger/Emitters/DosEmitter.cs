@@ -24,10 +24,10 @@ internal sealed class MsDosComEmitter : IBinaryEmitter
         return false;
     }
 
-    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    public byte[] EmitBinary(IntermediateProgram program, CompilerOptions options)
     {
-        DosProgramImage program = DosBrainFudgerEmitter.EmitProgramImage(sanitizedSource, options);
-        return DosBrainFudgerEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, ComOrigin);
+        DosProgramImage image = DosBrainFudgerEmitter.EmitProgramImage(program, options);
+        return DosBrainFudgerEmitter.PatchAndFlatten(image.CodeImage, image.DataImage, ComOrigin);
     }
 }
 
@@ -51,21 +51,21 @@ internal sealed class MsDosExeEmitter : IBinaryEmitter
         return false;
     }
 
-    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    public byte[] EmitBinary(IntermediateProgram program, CompilerOptions options)
     {
-        DosProgramImage program = DosBrainFudgerEmitter.EmitProgramImage(sanitizedSource, options);
-        byte[] imageBytes = DosBrainFudgerEmitter.PatchAndFlatten(program.CodeImage, program.DataImage, origin: 0);
+        DosProgramImage image = DosBrainFudgerEmitter.EmitProgramImage(program, options);
+        byte[] imageBytes = DosBrainFudgerEmitter.PatchAndFlatten(image.CodeImage, image.DataImage, origin: 0);
         return DosMzExecutableWriter.WriteExecutable(imageBytes, StackSize);
     }
 }
 
 internal static class DosBrainFudgerEmitter
 {
-    public static DosProgramImage EmitProgramImage(string sanitizedSource, CompilerOptions options)
+    public static DosProgramImage EmitProgramImage(IntermediateProgram program, CompilerOptions options)
     {
         DosAssembler assembler = new();
         EmitPrologue(assembler);
-        EmitProgram(assembler, sanitizedSource);
+        EmitProgram(assembler, program);
         EmitExit(assembler, 0);
         EmitErrorPath(assembler, "error_before", "pointer_before_message", 1);
         EmitErrorPath(assembler, "error_past", "pointer_past_message", 1);
@@ -113,6 +113,10 @@ internal static class DosBrainFudgerEmitter
         DefineLabel(labels, "tape", bytes.Count);
         bytes.AddRange(Enumerable.Repeat((byte)0, options.CellCount));
         DefineLabel(labels, "tape_end", bytes.Count);
+        DefineLabel(labels, EmitterRuntimeSupport.RngStateLabel, bytes.Count);
+        bytes.Add(0);
+        DefineLabel(labels, EmitterRuntimeSupport.ClearTerminalLabel, bytes.Count);
+        bytes.AddRange(EmitterRuntimeSupport.ClearTerminalSequence.ToArray());
 
         DefineDosString(labels, bytes, "pointer_before_message", "Pointer moved before the beginning of the tape.\r\n");
         DefineDosString(labels, bytes, "pointer_past_message", "Pointer moved past the end of the tape.\r\n");
@@ -156,80 +160,88 @@ internal static class DosBrainFudgerEmitter
         assembler.MovRegLabelOffset(DosRegister.Di, "tape_end");
     }
 
-    private static void EmitProgram(DosAssembler assembler, string sanitized)
+    private static void EmitProgram(DosAssembler assembler, IntermediateProgram program)
     {
-        Stack<(string StartLabel, string EndLabel)> loopStack = new();
-        int loopCounter = 0;
         int inputCounter = 0;
-
-        for (int i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < program.Instructions.Count; i++)
         {
-            char token = sanitized[i];
-
-            if (token is '+' or '-' or '>' or '<')
+            IntermediateInstruction instruction = program.Instructions[i];
+            switch (instruction.Opcode)
             {
-                int count = CountRepeatedTokens(sanitized, i, token);
-                EmitCompressedOperation(assembler, token, count);
-                i += count - 1;
-                continue;
-            }
+                case IntermediateOpcode.MovePointer:
+                    EmitPointerMove(assembler, instruction.Operand);
+                    break;
 
-            switch (token)
-            {
-                case '.':
+                case IntermediateOpcode.AddToCell:
+                    EmitAddToCell(assembler, instruction.Operand);
+                    break;
+
+                case IntermediateOpcode.WriteByte:
                     EmitWriteByte(assembler);
                     break;
 
-                case ',':
+                case IntermediateOpcode.ReadByte:
                     EmitReadByte(assembler, inputCounter);
                     inputCounter++;
                     break;
 
-                case '[':
-                    string startLabel = $"loop_start_{loopCounter}";
-                    string endLabel = $"loop_end_{loopCounter}";
-                    loopCounter++;
-                    assembler.Label(startLabel);
+                case IntermediateOpcode.LoopStart:
+                    assembler.Label(GetLoopStartLabel(i));
                     assembler.CmpBytePtrBxImmediate(0);
-                    assembler.JumpEqual(endLabel);
-                    loopStack.Push((startLabel, endLabel));
+                    assembler.JumpEqual(GetLoopEndLabel(instruction.MatchingInstructionIndex));
                     break;
 
-                case ']':
-                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
+                case IntermediateOpcode.LoopEnd:
                     assembler.CmpBytePtrBxImmediate(0);
-                    assembler.JumpNotEqual(loop.StartLabel);
-                    assembler.Label(loop.EndLabel);
+                    assembler.JumpNotEqual(GetLoopStartLabel(instruction.MatchingInstructionIndex));
+                    assembler.Label(GetLoopEndLabel(i));
+                    break;
+
+                case IntermediateOpcode.RandomByte:
+                    EmitRandomByte(assembler);
+                    break;
+
+                case IntermediateOpcode.ClearTerminal:
+                    EmitClearTerminal(assembler);
+                    break;
+
+                case IntermediateOpcode.Delay:
+                    EmitDelay(assembler, i);
                     break;
             }
         }
     }
 
-    private static void EmitCompressedOperation(DosAssembler assembler, char token, int count)
+    private static void EmitPointerMove(DosAssembler assembler, int count)
     {
-        switch (token)
+        if (count > 0)
         {
-            case '+':
-                assembler.AddBytePtrBxImmediate((byte)(count & 0xFF));
-                break;
+            assembler.AddRegImmediate16(DosRegister.Bx, (ushort)count);
+            assembler.CmpRegReg(DosRegister.Bx, DosRegister.Di);
+            assembler.JumpAboveOrEqual("error_past");
+            return;
+        }
 
-            case '-':
-                assembler.SubBytePtrBxImmediate((byte)(count & 0xFF));
-                break;
+        if (count < 0)
+        {
+            int distance = -count;
+            assembler.MovRegReg(DosRegister.Ax, DosRegister.Si);
+            assembler.AddRegImmediate16(DosRegister.Ax, (ushort)distance);
+            assembler.CmpRegReg(DosRegister.Bx, DosRegister.Ax);
+            assembler.JumpBelow("error_before");
+            assembler.SubRegImmediate16(DosRegister.Bx, (ushort)distance);
+        }
+    }
 
-            case '>':
-                assembler.AddRegImmediate16(DosRegister.Bx, (ushort)count);
-                assembler.CmpRegReg(DosRegister.Bx, DosRegister.Di);
-                assembler.JumpAboveOrEqual("error_past");
-                break;
-
-            case '<':
-                assembler.MovRegReg(DosRegister.Ax, DosRegister.Si);
-                assembler.AddRegImmediate16(DosRegister.Ax, (ushort)count);
-                assembler.CmpRegReg(DosRegister.Bx, DosRegister.Ax);
-                assembler.JumpBelow("error_before");
-                assembler.SubRegImmediate16(DosRegister.Bx, (ushort)count);
-                break;
+    private static void EmitAddToCell(DosAssembler assembler, int count)
+    {
+        if (count > 0)
+        {
+            assembler.AddBytePtrBxImmediate((byte)(count & 0xFF));
+        }
+        else if (count < 0)
+        {
+            assembler.SubBytePtrBxImmediate((byte)((-count) & 0xFF));
         }
     }
 
@@ -260,6 +272,54 @@ internal static class DosBrainFudgerEmitter
         assembler.Label(doneLabel);
     }
 
+    private static void EmitRandomByte(DosAssembler assembler)
+    {
+        assembler.MovRegLabelOffset(DosRegister.Si, EmitterRuntimeSupport.RngStateLabel);
+        assembler.XorRegReg(DosRegister.Ax, DosRegister.Ax);
+        assembler.MovAlBytePtrReg(DosRegister.Si);
+        assembler.MovRegReg(DosRegister.Cx, DosRegister.Ax);
+        assembler.ShiftLeftRegImmediate(DosRegister.Ax, 4);
+        assembler.AddRegReg(DosRegister.Ax, DosRegister.Cx);
+        assembler.AddRegImmediate16(DosRegister.Ax, 29);
+        assembler.MovBytePtrRegAl(DosRegister.Si);
+        assembler.MovBytePtrRegAl(DosRegister.Bx);
+    }
+
+    private static void EmitClearTerminal(DosAssembler assembler)
+    {
+        assembler.MovRegLabelOffset(DosRegister.Si, EmitterRuntimeSupport.ClearTerminalLabel);
+        for (int i = 0; i < EmitterRuntimeSupport.ClearTerminalLength; i++)
+        {
+            assembler.MovDlBytePtrReg(DosRegister.Si);
+            assembler.MovAhImmediate(0x02);
+            assembler.Int21();
+            if (i + 1 < EmitterRuntimeSupport.ClearTerminalLength)
+            {
+                assembler.AddRegImmediate16(DosRegister.Si, 1);
+            }
+        }
+    }
+
+    private static void EmitDelay(DosAssembler assembler, int instructionIndex)
+    {
+        string doneLabel = $"delay_done_{instructionIndex}";
+        string outerLabel = $"delay_outer_{instructionIndex}";
+        string innerLabel = $"delay_inner_{instructionIndex}";
+
+        assembler.XorRegReg(DosRegister.Ax, DosRegister.Ax);
+        assembler.MovAlBytePtrReg(DosRegister.Bx);
+        assembler.TestRegReg(DosRegister.Ax, DosRegister.Ax);
+        assembler.JumpEqual(doneLabel);
+        assembler.Label(outerLabel);
+        assembler.MovRegImmediate16(DosRegister.Cx, (ushort)EmitterRuntimeSupport.DelayInnerLoopCount);
+        assembler.Label(innerLabel);
+        assembler.SubRegImmediate16(DosRegister.Cx, 1);
+        assembler.JumpNotEqual(innerLabel);
+        assembler.SubRegImmediate16(DosRegister.Ax, 1);
+        assembler.JumpNotEqual(outerLabel);
+        assembler.Label(doneLabel);
+    }
+
     private static void EmitExit(DosAssembler assembler, byte exitCode)
     {
         assembler.MovAhImmediate(0x4C);
@@ -276,16 +336,9 @@ internal static class DosBrainFudgerEmitter
         EmitExit(assembler, exitCode);
     }
 
-    private static int CountRepeatedTokens(string source, int start, char token)
-    {
-        int count = 0;
-        while (start + count < source.Length && source[start + count] == token)
-        {
-            count++;
-        }
+    private static string GetLoopStartLabel(int instructionIndex) => $"loop_start_{instructionIndex}";
 
-        return count;
-    }
+    private static string GetLoopEndLabel(int instructionIndex) => $"loop_end_{instructionIndex}";
 }
 
 internal static class DosMzExecutableWriter
@@ -415,6 +468,21 @@ internal sealed class DosAssembler
 
     public void MovDlBytePtrBx() => EmitBytes(0x8A, 0x17);
 
+    public void MovDlBytePtrReg(DosRegister register)
+    {
+        EmitBytes(0x8A, BuildModRm(0b00, 2, GetMemoryEncoding(register)));
+    }
+
+    public void MovAlBytePtrReg(DosRegister register)
+    {
+        EmitBytes(0x8A, BuildModRm(0b00, 0, GetMemoryEncoding(register)));
+    }
+
+    public void MovBytePtrRegAl(DosRegister register)
+    {
+        EmitBytes(0x88, BuildModRm(0b00, 0, GetMemoryEncoding(register)));
+    }
+
     public void MovBytePtrBxImmediate(byte value) => EmitBytes(0xC6, 0x07, value);
 
     public void AddBytePtrBxImmediate(byte value) => EmitBytes(0x80, 0x07, value);
@@ -436,6 +504,16 @@ internal sealed class DosAssembler
     public void XorRegReg(DosRegister destination, DosRegister source)
     {
         EmitBytes(0x31, BuildModRm(0b11, (int)source, (int)destination));
+    }
+
+    public void AddRegReg(DosRegister destination, DosRegister source)
+    {
+        EmitBytes(0x01, BuildModRm(0b11, (int)source, (int)destination));
+    }
+
+    public void ShiftLeftRegImmediate(DosRegister register, byte value)
+    {
+        EmitBytes(0xC1, BuildModRm(0b11, 4, (int)register), value);
     }
 
     public void TestRegReg(DosRegister left, DosRegister right)
@@ -486,6 +564,16 @@ internal sealed class DosAssembler
     }
 
     private static byte BuildModRm(int mod, int reg, int rm) => (byte)((mod << 6) | (reg << 3) | rm);
+
+    private static int GetMemoryEncoding(DosRegister register) =>
+        register switch
+        {
+            DosRegister.Si => 0b100,
+            DosRegister.Di => 0b101,
+            DosRegister.Bx => 0b111,
+            DosRegister.Bp => 0b110,
+            _ => throw new InvalidOperationException($"Register '{register}' is not supported as a direct 16-bit memory base.")
+        };
 
     private void EmitBytes(params byte[] bytes) => _bytes.AddRange(bytes);
 

@@ -42,6 +42,18 @@ Everything else in a Brainf$#k source file is comment noise.
 | `[` | if current cell is zero, jump forward past the matching `]` |
 | `]` | if current cell is non-zero, jump back to the matching `[` |
 
+## Optional Extension Instructions
+
+The compiler also supports three opt-in extension commands. They are disabled by default and must be enabled explicitly through CLI flags or GUI checkboxes.
+
+| Token | Meaning |
+| --- | --- |
+| `?` | replace the current cell with a pseudorandom byte |
+| `!` | emit a best-effort terminal clear sequence |
+| `~` | perform a best-effort delay based on the current cell value |
+
+These are deliberately outside the core language. If the corresponding feature is not enabled, using the token is a compile-time error.
+
 ## Operational Semantics
 
 You can think of Brainf$#k as this little machine:
@@ -85,13 +97,13 @@ That makes programs deterministic across the currently supported targets.
 
 ## Comments And Ignored Characters
 
-Brainf$#k only cares about these eight tokens:
+Core Brainf$#k only cares about these eight tokens:
 
 ```text
 ><+-.,[]
 ```
 
-Everything else is ignored. The compiler frontend sanitizes the source by stripping everything except the eight significant tokens before validation or code generation.
+Everything else is ignored. When the optional extension flags are enabled, the compiler also treats `?`, `!`, and `~` as significant tokens before lowering to the intermediate opcode stream.
 
 ## Loop Matching
 
@@ -158,6 +170,19 @@ into a single "add 10" operation. The compiler described here does this for:
 - `-`
 - `>`
 - `<`
+
+### Shared Lowering Step
+
+The compiler frontend does not hand raw source text directly to each backend anymore.
+
+Instead it:
+
+1. filters the source down to significant tokens
+2. validates bracket matching
+3. lowers repeated arithmetic and pointer runs into a compact opcode stream
+4. sends that shared intermediate program to the selected emitter
+
+That keeps parsing, validation, and simple peephole compression out of the platform backends.
 
 ### Tape Bounds
 

@@ -11,4 +11,7 @@ public sealed record CompilerOptions
     public bool QuietRun { get; init; }
     public bool UseShellExecuteForRun { get; init; }
     public bool PauseAfterRun { get; init; }
+    public bool EnableRandomCommand { get; init; }
+    public bool EnableClearTerminalCommand { get; init; }
+    public bool EnableDelayCommand { get; init; }
 }

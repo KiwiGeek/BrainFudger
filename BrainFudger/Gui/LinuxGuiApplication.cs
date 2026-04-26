@@ -15,6 +15,7 @@ internal sealed class LinuxGuiApplication : IGuiApplicationHost
     private Entry? _outputEntry;
     private ComboBoxText? _targetCombo;
     private SpinButton? _cellsSpinButton;
+    private CheckButton? _enableExtensionsCheckButton;
     private Button? _buildButton;
     private Button? _runButton;
     private ProgressBar? _progressBar;
@@ -107,6 +108,12 @@ internal sealed class LinuxGuiApplication : IGuiApplicationHost
             Numeric = true
         };
         cellsColumn.PackStart(_cellsSpinButton, expand: false, fill: false, padding: 0);
+
+        Box extensionsRow = new(Orientation.Horizontal, 16);
+        root.PackStart(extensionsRow, expand: false, fill: false, padding: 0);
+
+        _enableExtensionsCheckButton = new CheckButton("Enable all extension commands (?, !, ~)");
+        extensionsRow.PackStart(_enableExtensionsCheckButton, expand: false, fill: false, padding: 0);
 
         Box buttonsRow = new(Orientation.Horizontal, 10);
         root.PackStart(buttonsRow, expand: false, fill: false, padding: 0);
@@ -367,6 +374,9 @@ internal sealed class LinuxGuiApplication : IGuiApplicationHost
                 quietRun: false,
                 cellCount,
                 emitter.TargetId,
+                _enableExtensionsCheckButton?.Active == true,
+                _enableExtensionsCheckButton?.Active == true,
+                _enableExtensionsCheckButton?.Active == true,
                 useShellExecuteForRun: false,
                 pauseAfterRun: false);
 
@@ -470,6 +480,7 @@ internal sealed class LinuxGuiApplication : IGuiApplicationHost
         _outputEntry!.Sensitive = enabled;
         _targetCombo!.Sensitive = enabled;
         _cellsSpinButton!.Sensitive = enabled;
+        _enableExtensionsCheckButton!.Sensitive = enabled;
         _buildButton!.Sensitive = enabled;
         _runButton!.Sensitive = enabled;
     }

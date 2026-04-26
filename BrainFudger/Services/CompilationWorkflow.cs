@@ -17,6 +17,9 @@ public static class CompilationWorkflow
         bool quietRun,
         int cells,
         string? target,
+        bool enableRandomCommand = false,
+        bool enableClearTerminalCommand = false,
+        bool enableDelayCommand = false,
         bool useShellExecuteForRun = false,
         bool pauseAfterRun = false)
     {
@@ -38,6 +41,9 @@ public static class CompilationWorkflow
             Target = resolvedTarget,
             Run = run,
             QuietRun = quietRun,
+            EnableRandomCommand = enableRandomCommand,
+            EnableClearTerminalCommand = enableClearTerminalCommand,
+            EnableDelayCommand = enableDelayCommand,
             UseShellExecuteForRun = useShellExecuteForRun,
             PauseAfterRun = pauseAfterRun
         };

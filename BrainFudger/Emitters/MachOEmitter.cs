@@ -32,10 +32,10 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         return true;
     }
 
-    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    public byte[] EmitBinary(IntermediateProgram program, CompilerOptions options)
     {
         SectionImage dataImage = BuildDataImage(options);
-        Arm64CodeImage codeImage = BuildCodeImage(sanitizedSource);
+        Arm64CodeImage codeImage = BuildCodeImage(program);
         return MachOArm64Writer.WriteExecutable(codeImage, dataImage);
     }
 
@@ -65,16 +65,20 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         builder.WriteZeros(options.CellCount);
         builder.DefineLabel("tape_end");
         builder.Align(8);
+        builder.DefineLabel(EmitterRuntimeSupport.RngStateLabel);
+        builder.WriteZeros(1);
+        builder.DefineLabel(EmitterRuntimeSupport.ClearTerminalLabel);
+        builder.WriteBytes(EmitterRuntimeSupport.ClearTerminalSequence);
         builder.DefineAsciiString("pointer_before_message", "Pointer moved before the beginning of the tape.\n");
         builder.DefineAsciiString("pointer_past_message", "Pointer moved past the end of the tape.\n");
         return builder.ToImage();
     }
 
-    private static Arm64CodeImage BuildCodeImage(string sanitized)
+    private static Arm64CodeImage BuildCodeImage(IntermediateProgram program)
     {
         Arm64Assembler assembler = new();
         EmitPrologue(assembler);
-        EmitProgram(assembler, sanitized);
+        EmitProgram(assembler, program);
         assembler.Branch("program_exit");
         EmitErrorPath(assembler, "error_before", "pointer_before_message");
         EmitErrorPath(assembler, "error_past", "pointer_past_message");
@@ -92,76 +96,71 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         assembler.AdrpAddLabel(21, "tape_end");
     }
 
-    private static void EmitProgram(Arm64Assembler assembler, string sanitized)
+    private static void EmitProgram(Arm64Assembler assembler, IntermediateProgram program)
     {
-        Stack<(string StartLabel, string EndLabel)> loopStack = new();
-        int loopCounter = 0;
         int inputCounter = 0;
-
-        for (int i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < program.Instructions.Count; i++)
         {
-            char token = sanitized[i];
-
-            if (token is '+' or '-' or '>' or '<')
+            IntermediateInstruction instruction = program.Instructions[i];
+            switch (instruction.Opcode)
             {
-                int count = CountRepeatedTokens(sanitized, i, token);
-                EmitCompressedOperation(assembler, token, count);
-                i += count - 1;
-                continue;
-            }
+                case IntermediateOpcode.MovePointer:
+                    EmitPointerMove(assembler, instruction.Operand);
+                    break;
 
-            switch (token)
-            {
-                case '.':
+                case IntermediateOpcode.AddToCell:
+                    EmitAddToCell(assembler, instruction.Operand);
+                    break;
+
+                case IntermediateOpcode.WriteByte:
                     EmitWriteByte(assembler);
                     break;
 
-                case ',':
+                case IntermediateOpcode.ReadByte:
                     EmitReadByte(assembler, inputCounter);
                     inputCounter++;
                     break;
 
-                case '[':
-                    string startLabel = $"loop_start_{loopCounter}";
-                    string endLabel = $"loop_end_{loopCounter}";
-                    loopCounter++;
-                    assembler.Label(startLabel);
+                case IntermediateOpcode.LoopStart:
+                    assembler.Label(GetLoopStartLabel(i));
                     assembler.LoadByte(9, 19);
                     assembler.CompareImmediate32(9, 0);
-                    assembler.BranchConditional(endLabel, Arm64Condition.Equal);
-                    loopStack.Push((startLabel, endLabel));
+                    assembler.BranchConditional(GetLoopEndLabel(instruction.MatchingInstructionIndex), Arm64Condition.Equal);
                     break;
 
-                case ']':
-                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
+                case IntermediateOpcode.LoopEnd:
                     assembler.LoadByte(9, 19);
                     assembler.CompareImmediate32(9, 0);
-                    assembler.BranchConditional(loop.StartLabel, Arm64Condition.NotEqual);
-                    assembler.Label(loop.EndLabel);
+                    assembler.BranchConditional(GetLoopStartLabel(instruction.MatchingInstructionIndex), Arm64Condition.NotEqual);
+                    assembler.Label(GetLoopEndLabel(i));
+                    break;
+
+                case IntermediateOpcode.RandomByte:
+                    EmitRandomByte(assembler);
+                    break;
+
+                case IntermediateOpcode.ClearTerminal:
+                    EmitClearTerminal(assembler);
+                    break;
+
+                case IntermediateOpcode.Delay:
+                    EmitDelay(assembler, i);
                     break;
             }
         }
     }
 
-    private static void EmitCompressedOperation(Arm64Assembler assembler, char token, int count)
+    private static void EmitPointerMove(Arm64Assembler assembler, int count)
     {
-        switch (token)
+        if (count > 0)
         {
-            case '+':
-                EmitAddToCell(assembler, count & 0xFF);
-                break;
+            EmitPointerMove(assembler, count, moveRight: true);
+            return;
+        }
 
-            case '-':
-                EmitSubtractFromCell(assembler, count & 0xFF);
-                break;
-
-            case '>':
-                EmitPointerMove(assembler, count, moveRight: true);
-                break;
-
-            case '<':
-                EmitPointerMove(assembler, count, moveRight: false);
-                break;
+        if (count < 0)
+        {
+            EmitPointerMove(assembler, -count, moveRight: false);
         }
     }
 
@@ -169,6 +168,12 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
     {
         if (value == 0)
         {
+            return;
+        }
+
+        if (value < 0)
+        {
+            EmitSubtractFromCell(assembler, -value);
             return;
         }
 
@@ -239,6 +244,51 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         assembler.Label(doneLabel);
     }
 
+    private static void EmitRandomByte(Arm64Assembler assembler)
+    {
+        assembler.AdrpAddLabel(22, EmitterRuntimeSupport.RngStateLabel);
+        assembler.LoadByte(9, 22);
+        assembler.MoveRegister64(10, 9);
+        assembler.AddRegister32(9, 9, 9);
+        assembler.AddRegister32(9, 9, 9);
+        assembler.AddRegister32(9, 9, 9);
+        assembler.AddRegister32(9, 9, 9);
+        assembler.AddRegister32(9, 9, 10);
+        assembler.AddImmediate32(9, 9, 29);
+        assembler.StoreByte(9, 22);
+        assembler.StoreByte(9, 19);
+    }
+
+    private static void EmitClearTerminal(Arm64Assembler assembler)
+    {
+        assembler.MovImmediate64(0, 1);
+        assembler.AdrpAddLabel(1, EmitterRuntimeSupport.ClearTerminalLabel);
+        assembler.MovImmediate64(2, EmitterRuntimeSupport.ClearTerminalLength);
+        assembler.MovImmediate64(16, 4);
+        assembler.Svc(0x80);
+    }
+
+    private static void EmitDelay(Arm64Assembler assembler, int instructionIndex)
+    {
+        string doneLabel = $"delay_done_{instructionIndex}";
+        string outerLabel = $"delay_outer_{instructionIndex}";
+        string innerLabel = $"delay_inner_{instructionIndex}";
+
+        assembler.LoadByte(9, 19);
+        assembler.CompareImmediate32(9, 0);
+        assembler.BranchConditional(doneLabel, Arm64Condition.Equal);
+        assembler.Label(outerLabel);
+        assembler.MovImmediate64(10, EmitterRuntimeSupport.DelayInnerLoopCount);
+        assembler.Label(innerLabel);
+        assembler.SubtractImmediate64(10, 10, 1);
+        assembler.CompareImmediate64(10, 0);
+        assembler.BranchConditional(innerLabel, Arm64Condition.NotEqual);
+        assembler.SubtractImmediate32(9, 9, 1);
+        assembler.CompareImmediate32(9, 0);
+        assembler.BranchConditional(outerLabel, Arm64Condition.NotEqual);
+        assembler.Label(doneLabel);
+    }
+
     private static void EmitErrorPath(Arm64Assembler assembler, string label, string messageLabel)
     {
         assembler.Label(label);
@@ -252,16 +302,9 @@ internal sealed class MacOsArm64MachOEmitter : IBinaryEmitter
         assembler.Svc(0x80);
     }
 
-    private static int CountRepeatedTokens(string source, int start, char token)
-    {
-        int count = 0;
-        while (start + count < source.Length && source[start + count] == token)
-        {
-            count++;
-        }
+    private static string GetLoopStartLabel(int instructionIndex) => $"loop_start_{instructionIndex}";
 
-        return count;
-    }
+    private static string GetLoopEndLabel(int instructionIndex) => $"loop_end_{instructionIndex}";
 
     private static int GetMessageLength(string messageLabel) =>
         messageLabel switch
@@ -714,6 +757,11 @@ internal sealed class Arm64Assembler
     public void AddImmediate32(int destinationRegister, int sourceRegister, int immediate)
     {
         EmitImmediateArithmetic(0x11000000u, destinationRegister, sourceRegister, immediate);
+    }
+
+    public void AddRegister32(int destinationRegister, int leftRegister, int rightRegister)
+    {
+        EmitUInt32(0x0B000000u | ((uint)rightRegister << 16) | ((uint)leftRegister << 5) | (uint)destinationRegister);
     }
 
     public void SubtractImmediate32(int destinationRegister, int sourceRegister, int immediate)

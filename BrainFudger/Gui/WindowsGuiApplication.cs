@@ -21,6 +21,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
     private const int ControlIdBuildButton = 1007;
     private const int ControlIdRunButton = 1008;
     private const int ControlIdStatusLabel = 1009;
+    private const int ControlIdEnableExtensions = 1010;
 
     private readonly WndProc _wndProc;
     private readonly IBinaryEmitter[] _emitters;
@@ -33,6 +34,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
     private nint _outputBrowseHandle;
     private nint _targetComboHandle;
     private nint _cellsEditHandle;
+    private nint _enableExtensionsHandle;
     private nint _buildButtonHandle;
     private nint _runButtonHandle;
     private nint _progressBarHandle;
@@ -142,7 +144,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
             NativeMethods.CW_USEDEFAULT,
             NativeMethods.CW_USEDEFAULT,
             700,
-            360,
+            400,
             0,
             0,
             instanceHandle,
@@ -252,13 +254,15 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
         _cellsEditHandle = CreateEdit(windowHandle, ControlIdCellsEdit, 270, 190, 120, 24);
         SetControlText(_cellsEditHandle, "30000");
 
-        _buildButtonHandle = CreateButton(windowHandle, "Build", ControlIdBuildButton, 430, 188, 110, 30);
-        _runButtonHandle = CreateButton(windowHandle, "Run", ControlIdRunButton, 550, 188, 110, 30);
+        _enableExtensionsHandle = CreateCheckbox(windowHandle, "Enable all extension commands (?, !, ~)", ControlIdEnableExtensions, 20, 226, 340, 24);
 
-        _progressBarHandle = CreateProgressBar(windowHandle, 20, 236, 640, 20);
+        _buildButtonHandle = CreateButton(windowHandle, "Build", ControlIdBuildButton, 430, 222, 110, 30);
+        _runButtonHandle = CreateButton(windowHandle, "Run", ControlIdRunButton, 550, 222, 110, 30);
+
+        _progressBarHandle = CreateProgressBar(windowHandle, 20, 270, 640, 20);
         NativeMethods.ShowWindow(_progressBarHandle, NativeMethods.SW_HIDE);
 
-        _statusLabelHandle = CreateLabel(windowHandle, "Choose a source file, target, and output path. Run uses a temporary output just like --run.", 20, 266, 640, 44);
+        _statusLabelHandle = CreateLabel(windowHandle, "Choose a source file, target, and output path. Run uses a temporary output just like --run.", 20, 300, 640, 44);
 
         PopulateTargetChoices();
     }
@@ -439,6 +443,9 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
                 quietRun: false,
                 cellCount,
                 emitter.TargetId,
+                IsCheckboxChecked(_enableExtensionsHandle),
+                IsCheckboxChecked(_enableExtensionsHandle),
+                IsCheckboxChecked(_enableExtensionsHandle),
                 useShellExecuteForRun: run,
                 pauseAfterRun: run);
 
@@ -537,6 +544,7 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
         NativeMethods.EnableWindow(_outputBrowseHandle, enabled);
         NativeMethods.EnableWindow(_targetComboHandle, enabled);
         NativeMethods.EnableWindow(_cellsEditHandle, enabled);
+        NativeMethods.EnableWindow(_enableExtensionsHandle, enabled);
         NativeMethods.EnableWindow(_buildButtonHandle, enabled);
         NativeMethods.EnableWindow(_runButtonHandle, enabled);
     }
@@ -627,6 +635,11 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
         return $"{upperExtension} Files (*.{extension})\0*.{extension}\0All Files (*.*)\0*.*\0\0";
     }
 
+    private static bool IsCheckboxChecked(nint handle)
+    {
+        return NativeMethods.SendMessage(handle, NativeMethods.BM_GETCHECK, 0, 0) == NativeMethods.BST_CHECKED;
+    }
+
     private static nint CreateLabel(nint parent, string text, int x, int y, int width, int height)
     {
         nint handle = NativeMethods.CreateWindowEx(
@@ -672,6 +685,25 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
             "BUTTON",
             text,
             NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | NativeMethods.WS_TABSTOP | NativeMethods.BS_PUSHBUTTON,
+            x,
+            y,
+            width,
+            height,
+            parent,
+            (nint)controlId,
+            NativeMethods.GetModuleHandle(null),
+            0);
+        ApplyDefaultGuiFont(handle);
+        return handle;
+    }
+
+    private nint CreateCheckbox(nint parent, string text, int controlId, int x, int y, int width, int height)
+    {
+        nint handle = NativeMethods.CreateWindowEx(
+            0,
+            "BUTTON",
+            text,
+            NativeMethods.WS_CHILD | NativeMethods.WS_VISIBLE | NativeMethods.WS_TABSTOP | NativeMethods.BS_AUTOCHECKBOX,
             x,
             y,
             width,
@@ -892,7 +924,10 @@ internal sealed class WindowsGuiApplication : IGuiApplicationHost
     {
         public const string ProgressBarClassName = "msctls_progress32";
         public const int BN_CLICKED = 0;
+        public const int BM_GETCHECK = 0x00F0;
         public const int BS_PUSHBUTTON = 0x00000000;
+        public const int BS_AUTOCHECKBOX = 0x00000003;
+        public const int BST_CHECKED = 1;
         public const int CBN_SELCHANGE = 1;
         public const int CB_ADDSTRING = 0x0143;
         public const int CB_GETCURSEL = 0x0147;

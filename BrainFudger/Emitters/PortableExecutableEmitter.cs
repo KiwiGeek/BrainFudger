@@ -34,11 +34,11 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         return true;
     }
 
-    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    public byte[] EmitBinary(IntermediateProgram program, CompilerOptions options)
     {
         SectionImage dataSection = BuildDataSection(options);
         SectionImage importSection = BuildImportSection();
-        X86CodeImage codeImage = BuildCodeImage(sanitizedSource);
+        X86CodeImage codeImage = BuildCodeImage(program);
         return PortableExecutableWriter32.WriteExecutable(codeImage, importSection, dataSection);
     }
 
@@ -58,6 +58,10 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         builder.Align(4);
         builder.DefineLabel("io_result");
         builder.WriteUInt32(0);
+        builder.DefineLabel(EmitterRuntimeSupport.RngStateLabel);
+        builder.WriteUInt32(0);
+        builder.DefineLabel(EmitterRuntimeSupport.ClearTerminalLabel);
+        builder.WriteBytes(EmitterRuntimeSupport.ClearTerminalSequence);
         builder.DefineAsciiString("pointer_before_message", "Pointer moved before the beginning of the tape.\r\n");
         builder.DefineAsciiString("pointer_past_message", "Pointer moved past the end of the tape.\r\n");
         return builder.ToImage();
@@ -78,6 +82,7 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         builder.WriteLabelReference32("GetStdHandle_hint");
         builder.WriteLabelReference32("ReadFile_hint");
         builder.WriteLabelReference32("WriteFile_hint");
+        builder.WriteLabelReference32("Sleep_hint");
         builder.WriteLabelReference32("ExitProcess_hint");
         builder.WriteUInt32(0);
 
@@ -87,6 +92,8 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         builder.WriteLabelReference32("ReadFile_hint");
         builder.DefineLabel("WriteFile_iat");
         builder.WriteLabelReference32("WriteFile_hint");
+        builder.DefineLabel("Sleep_iat");
+        builder.WriteLabelReference32("Sleep_hint");
         builder.DefineLabel("ExitProcess_iat");
         builder.WriteLabelReference32("ExitProcess_hint");
         builder.WriteUInt32(0);
@@ -109,6 +116,11 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         builder.WriteAsciiStringRaw("WriteFile");
 
         builder.Align(2);
+        builder.DefineLabel("Sleep_hint");
+        builder.WriteUInt16(0);
+        builder.WriteAsciiStringRaw("Sleep");
+
+        builder.Align(2);
         builder.DefineLabel("ExitProcess_hint");
         builder.WriteUInt16(0);
         builder.WriteAsciiStringRaw("ExitProcess");
@@ -116,11 +128,11 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         return builder.ToImage();
     }
 
-    private static X86CodeImage BuildCodeImage(string sanitized)
+    private static X86CodeImage BuildCodeImage(IntermediateProgram program)
     {
         X86Assembler assembler = new();
         EmitPrologue(assembler);
-        EmitProgram(assembler, sanitized);
+        EmitProgram(assembler, program);
         assembler.Jump("program_exit");
         EmitErrorPath(assembler, "error_before", "pointer_before_message");
         EmitErrorPath(assembler, "error_past", "pointer_past_message");
@@ -149,80 +161,88 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         assembler.MovRegLabelAddress(X86Register.Edi, "tape_end");
     }
 
-    private static void EmitProgram(X86Assembler assembler, string sanitized)
+    private static void EmitProgram(X86Assembler assembler, IntermediateProgram program)
     {
-        Stack<(string StartLabel, string EndLabel)> loopStack = new();
-        int loopCounter = 0;
         int inputCounter = 0;
-
-        for (int i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < program.Instructions.Count; i++)
         {
-            char token = sanitized[i];
-
-            if (token is '+' or '-' or '>' or '<')
+            IntermediateInstruction instruction = program.Instructions[i];
+            switch (instruction.Opcode)
             {
-                int count = CountRepeatedTokens(sanitized, i, token);
-                EmitCompressedOperation(assembler, token, count);
-                i += count - 1;
-                continue;
-            }
+                case IntermediateOpcode.MovePointer:
+                    EmitPointerMove(assembler, instruction.Operand);
+                    break;
 
-            switch (token)
-            {
-                case '.':
+                case IntermediateOpcode.AddToCell:
+                    EmitAddToCell(assembler, instruction.Operand);
+                    break;
+
+                case IntermediateOpcode.WriteByte:
                     EmitWriteByte(assembler);
                     break;
 
-                case ',':
+                case IntermediateOpcode.ReadByte:
                     EmitReadByte(assembler, inputCounter);
                     inputCounter++;
                     break;
 
-                case '[':
-                    string startLabel = $"loop_start_{loopCounter}";
-                    string endLabel = $"loop_end_{loopCounter}";
-                    loopCounter++;
-                    assembler.Label(startLabel);
+                case IntermediateOpcode.LoopStart:
+                    assembler.Label(GetLoopStartLabel(i));
                     assembler.CmpBytePtrEbxImmediate(0);
-                    assembler.JumpEqual(endLabel);
-                    loopStack.Push((startLabel, endLabel));
+                    assembler.JumpEqual(GetLoopEndLabel(instruction.MatchingInstructionIndex));
                     break;
 
-                case ']':
-                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
+                case IntermediateOpcode.LoopEnd:
                     assembler.CmpBytePtrEbxImmediate(0);
-                    assembler.JumpNotEqual(loop.StartLabel);
-                    assembler.Label(loop.EndLabel);
+                    assembler.JumpNotEqual(GetLoopStartLabel(instruction.MatchingInstructionIndex));
+                    assembler.Label(GetLoopEndLabel(i));
+                    break;
+
+                case IntermediateOpcode.RandomByte:
+                    EmitRandomByte(assembler);
+                    break;
+
+                case IntermediateOpcode.ClearTerminal:
+                    EmitClearTerminal(assembler);
+                    break;
+
+                case IntermediateOpcode.Delay:
+                    EmitDelay(assembler);
                     break;
             }
         }
     }
 
-    private static void EmitCompressedOperation(X86Assembler assembler, char token, int count)
+    private static void EmitPointerMove(X86Assembler assembler, int count)
     {
-        switch (token)
+        if (count > 0)
         {
-            case '+':
-                assembler.AddBytePtrEbxImmediate((byte)(count & 0xFF));
-                break;
+            assembler.AddReg32Immediate(X86Register.Ebx, count);
+            assembler.CmpRegReg(X86Register.Ebx, X86Register.Edi);
+            assembler.JumpAboveOrEqual("error_past");
+            return;
+        }
 
-            case '-':
-                assembler.SubBytePtrEbxImmediate((byte)(count & 0xFF));
-                break;
+        if (count < 0)
+        {
+            int distance = -count;
+            assembler.MovRegReg(X86Register.Eax, X86Register.Esi);
+            assembler.AddReg32Immediate(X86Register.Eax, distance);
+            assembler.CmpRegReg(X86Register.Ebx, X86Register.Eax);
+            assembler.JumpBelow("error_before");
+            assembler.SubReg32Immediate(X86Register.Ebx, distance);
+        }
+    }
 
-            case '>':
-                assembler.AddReg32Immediate(X86Register.Ebx, count);
-                assembler.CmpRegReg(X86Register.Ebx, X86Register.Edi);
-                assembler.JumpAboveOrEqual("error_past");
-                break;
-
-            case '<':
-                assembler.MovRegReg(X86Register.Eax, X86Register.Esi);
-                assembler.AddReg32Immediate(X86Register.Eax, count);
-                assembler.CmpRegReg(X86Register.Ebx, X86Register.Eax);
-                assembler.JumpBelow("error_before");
-                assembler.SubReg32Immediate(X86Register.Ebx, count);
-                break;
+    private static void EmitAddToCell(X86Assembler assembler, int count)
+    {
+        if (count > 0)
+        {
+            assembler.AddBytePtrEbxImmediate((byte)(count & 0xFF));
+        }
+        else if (count < 0)
+        {
+            assembler.SubBytePtrEbxImmediate((byte)((-count) & 0xFF));
         }
     }
 
@@ -258,6 +278,38 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         assembler.Label(doneLabel);
     }
 
+    private static void EmitRandomByte(X86Assembler assembler)
+    {
+        assembler.MovRegLabelAddress(X86Register.Ecx, EmitterRuntimeSupport.RngStateLabel);
+        assembler.XorRegReg(X86Register.Eax, X86Register.Eax);
+        assembler.MovAlBytePtrReg(X86Register.Ecx);
+        assembler.MovRegReg(X86Register.Edx, X86Register.Eax);
+        assembler.ShiftLeftRegImmediate(X86Register.Eax, 4);
+        assembler.AddRegReg(X86Register.Eax, X86Register.Edx);
+        assembler.AddReg32Immediate(X86Register.Eax, 29);
+        assembler.MovBytePtrRegAl(X86Register.Ecx);
+        assembler.MovBytePtrRegAl(X86Register.Ebx);
+    }
+
+    private static void EmitClearTerminal(X86Assembler assembler)
+    {
+        assembler.PushImmediate32(0);
+        assembler.PushLabelAddress("io_result");
+        assembler.PushImmediate32(EmitterRuntimeSupport.ClearTerminalLength);
+        assembler.PushLabelAddress(EmitterRuntimeSupport.ClearTerminalLabel);
+        assembler.MovRegDwordPtrLabel(X86Register.Eax, "stdout_handle");
+        assembler.PushReg(X86Register.Eax);
+        assembler.CallIat("WriteFile_iat");
+    }
+
+    private static void EmitDelay(X86Assembler assembler)
+    {
+        assembler.XorRegReg(X86Register.Eax, X86Register.Eax);
+        assembler.MovAlBytePtrReg(X86Register.Ebx);
+        assembler.PushReg(X86Register.Eax);
+        assembler.CallIat("Sleep_iat");
+    }
+
     private static void EmitErrorPath(X86Assembler assembler, string label, string messageLabel)
     {
         assembler.Label(label);
@@ -272,16 +324,9 @@ internal sealed class Win32X86PortableExecutableEmitter : IBinaryEmitter
         assembler.CallIat("ExitProcess_iat");
     }
 
-    private static int CountRepeatedTokens(string source, int start, char token)
-    {
-        int count = 0;
-        while (start + count < source.Length && source[start + count] == token)
-        {
-            count++;
-        }
+    private static string GetLoopStartLabel(int instructionIndex) => $"loop_start_{instructionIndex}";
 
-        return count;
-    }
+    private static string GetLoopEndLabel(int instructionIndex) => $"loop_end_{instructionIndex}";
 
     private static int GetMessageLength(string messageLabel) =>
         messageLabel switch
@@ -322,11 +367,11 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         return true;
     }
 
-    public byte[] EmitBinary(string sanitizedSource, CompilerOptions options)
+    public byte[] EmitBinary(IntermediateProgram program, CompilerOptions options)
     {
         SectionImage dataSection = BuildDataSection(options);
         SectionImage importSection = BuildImportSection();
-        CodeImage codeImage = BuildCodeImage(sanitizedSource);
+        CodeImage codeImage = BuildCodeImage(program);
         return PortableExecutableWriter.WriteExecutable(codeImage, importSection, dataSection);
     }
 
@@ -340,6 +385,10 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         builder.Align(8);
         builder.DefineLabel("io_result");
         builder.WriteZeros(8);
+        builder.DefineLabel(EmitterRuntimeSupport.RngStateLabel);
+        builder.WriteUInt32(0);
+        builder.DefineLabel(EmitterRuntimeSupport.ClearTerminalLabel);
+        builder.WriteBytes(EmitterRuntimeSupport.ClearTerminalSequence);
         builder.DefineAsciiString("pointer_before_message", "Pointer moved before the beginning of the tape.\r\n");
         builder.DefineAsciiString("pointer_past_message", "Pointer moved past the end of the tape.\r\n");
         return builder.ToImage();
@@ -360,6 +409,7 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         builder.WriteLabelReference64("GetStdHandle_hint");
         builder.WriteLabelReference64("ReadFile_hint");
         builder.WriteLabelReference64("WriteFile_hint");
+        builder.WriteLabelReference64("Sleep_hint");
         builder.WriteLabelReference64("ExitProcess_hint");
         builder.WriteUInt64(0);
 
@@ -369,6 +419,8 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         builder.WriteLabelReference64("ReadFile_hint");
         builder.DefineLabel("WriteFile_iat");
         builder.WriteLabelReference64("WriteFile_hint");
+        builder.DefineLabel("Sleep_iat");
+        builder.WriteLabelReference64("Sleep_hint");
         builder.DefineLabel("ExitProcess_iat");
         builder.WriteLabelReference64("ExitProcess_hint");
         builder.WriteUInt64(0);
@@ -391,6 +443,11 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         builder.WriteAsciiStringRaw("WriteFile");
 
         builder.Align(2);
+        builder.DefineLabel("Sleep_hint");
+        builder.WriteUInt16(0);
+        builder.WriteAsciiStringRaw("Sleep");
+
+        builder.Align(2);
         builder.DefineLabel("ExitProcess_hint");
         builder.WriteUInt16(0);
         builder.WriteAsciiStringRaw("ExitProcess");
@@ -398,11 +455,11 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         return builder.ToImage();
     }
 
-    private static CodeImage BuildCodeImage(string sanitized)
+    private static CodeImage BuildCodeImage(IntermediateProgram program)
     {
         X64Assembler assembler = new();
         EmitPrologue(assembler);
-        EmitProgram(assembler, sanitized);
+        EmitProgram(assembler, program);
         assembler.Jump("program_exit");
         EmitErrorPath(assembler, "error_before", "pointer_before_message");
         EmitErrorPath(assembler, "error_past", "pointer_past_message");
@@ -433,80 +490,88 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         assembler.LeaRipLabel(AssemblerRegister.R13, "tape_end");
     }
 
-    private static void EmitProgram(X64Assembler assembler, string sanitized)
+    private static void EmitProgram(X64Assembler assembler, IntermediateProgram program)
     {
-        Stack<(string StartLabel, string EndLabel)> loopStack = new();
-        int loopCounter = 0;
         int inputCounter = 0;
-
-        for (int i = 0; i < sanitized.Length; i++)
+        for (int i = 0; i < program.Instructions.Count; i++)
         {
-            char token = sanitized[i];
-
-            if (token is '+' or '-' or '>' or '<')
+            IntermediateInstruction instruction = program.Instructions[i];
+            switch (instruction.Opcode)
             {
-                int count = CountRepeatedTokens(sanitized, i, token);
-                EmitCompressedOperation(assembler, token, count);
-                i += count - 1;
-                continue;
-            }
+                case IntermediateOpcode.MovePointer:
+                    EmitPointerMove(assembler, instruction.Operand);
+                    break;
 
-            switch (token)
-            {
-                case '.':
+                case IntermediateOpcode.AddToCell:
+                    EmitAddToCell(assembler, instruction.Operand);
+                    break;
+
+                case IntermediateOpcode.WriteByte:
                     EmitWriteByte(assembler);
                     break;
 
-                case ',':
+                case IntermediateOpcode.ReadByte:
                     EmitReadByte(assembler, inputCounter);
                     inputCounter++;
                     break;
 
-                case '[':
-                    string startLabel = $"loop_start_{loopCounter}";
-                    string endLabel = $"loop_end_{loopCounter}";
-                    loopCounter++;
-                    assembler.Label(startLabel);
+                case IntermediateOpcode.LoopStart:
+                    assembler.Label(GetLoopStartLabel(i));
                     assembler.CmpBytePtrRbxImmediate(0);
-                    assembler.JumpEqual(endLabel);
-                    loopStack.Push((startLabel, endLabel));
+                    assembler.JumpEqual(GetLoopEndLabel(instruction.MatchingInstructionIndex));
                     break;
 
-                case ']':
-                    (string StartLabel, string EndLabel) loop = loopStack.Pop();
+                case IntermediateOpcode.LoopEnd:
                     assembler.CmpBytePtrRbxImmediate(0);
-                    assembler.JumpNotEqual(loop.StartLabel);
-                    assembler.Label(loop.EndLabel);
+                    assembler.JumpNotEqual(GetLoopStartLabel(instruction.MatchingInstructionIndex));
+                    assembler.Label(GetLoopEndLabel(i));
+                    break;
+
+                case IntermediateOpcode.RandomByte:
+                    EmitRandomByte(assembler);
+                    break;
+
+                case IntermediateOpcode.ClearTerminal:
+                    EmitClearTerminal(assembler);
+                    break;
+
+                case IntermediateOpcode.Delay:
+                    EmitDelay(assembler);
                     break;
             }
         }
     }
 
-    private static void EmitCompressedOperation(X64Assembler assembler, char token, int count)
+    private static void EmitPointerMove(X64Assembler assembler, int count)
     {
-        switch (token)
+        if (count > 0)
         {
-            case '+':
-                assembler.AddBytePtrRbxImmediate((byte)(count & 0xFF));
-                break;
+            assembler.AddReg64Immediate(AssemblerRegister.Rbx, count);
+            assembler.CmpRegReg(AssemblerRegister.Rbx, AssemblerRegister.R13);
+            assembler.JumpAboveOrEqual("error_past");
+            return;
+        }
 
-            case '-':
-                assembler.SubBytePtrRbxImmediate((byte)(count & 0xFF));
-                break;
+        if (count < 0)
+        {
+            int distance = -count;
+            assembler.MovRegReg(AssemblerRegister.Rax, AssemblerRegister.R12);
+            assembler.AddReg64Immediate(AssemblerRegister.Rax, distance);
+            assembler.CmpRegReg(AssemblerRegister.Rbx, AssemblerRegister.Rax);
+            assembler.JumpBelow("error_before");
+            assembler.SubReg64Immediate(AssemblerRegister.Rbx, distance);
+        }
+    }
 
-            case '>':
-                assembler.AddReg64Immediate(AssemblerRegister.Rbx, count);
-                assembler.CmpRegReg(AssemblerRegister.Rbx, AssemblerRegister.R13);
-                assembler.JumpAboveOrEqual("error_past");
-                break;
-
-            case '<':
-                assembler.MovRegReg(AssemblerRegister.Rax, AssemblerRegister.R12);
-                assembler.AddReg64Immediate(AssemblerRegister.Rax, count);
-                assembler.CmpRegReg(AssemblerRegister.Rbx, AssemblerRegister.Rax);
-                assembler.JumpBelow("error_before");
-                assembler.SubReg64Immediate(AssemblerRegister.Rbx, count);
-                break;
+    private static void EmitAddToCell(X64Assembler assembler, int count)
+    {
+        if (count > 0)
+        {
+            assembler.AddBytePtrRbxImmediate((byte)(count & 0xFF));
+        }
+        else if (count < 0)
+        {
+            assembler.SubBytePtrRbxImmediate((byte)((-count) & 0xFF));
         }
     }
 
@@ -540,6 +605,37 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         assembler.Label(doneLabel);
     }
 
+    private static void EmitRandomByte(X64Assembler assembler)
+    {
+        assembler.LeaRipLabel(AssemblerRegister.Rcx, EmitterRuntimeSupport.RngStateLabel);
+        assembler.XorReg32(AssemblerRegister.Rax, AssemblerRegister.Rax);
+        assembler.MovAlBytePtrReg(AssemblerRegister.Rcx);
+        assembler.MovRegReg(AssemblerRegister.Rdx, AssemblerRegister.Rax);
+        assembler.ShiftLeftReg32Immediate(AssemblerRegister.Rax, 4);
+        assembler.AddReg32Reg32(AssemblerRegister.Rax, AssemblerRegister.Rdx);
+        assembler.AddReg64Immediate(AssemblerRegister.Rax, 29);
+        assembler.MovBytePtrRegAl(AssemblerRegister.Rcx);
+        assembler.MovBytePtrRegAl(AssemblerRegister.Rbx);
+    }
+
+    private static void EmitClearTerminal(X64Assembler assembler)
+    {
+        assembler.MovRegReg(AssemblerRegister.Rcx, AssemblerRegister.R15);
+        assembler.LeaRipLabel(AssemblerRegister.Rdx, EmitterRuntimeSupport.ClearTerminalLabel);
+        assembler.MovReg32Immediate(AssemblerRegister.R8, EmitterRuntimeSupport.ClearTerminalLength);
+        assembler.LeaRipLabel(AssemblerRegister.R9, "io_result");
+        assembler.MovStackQwordImmediate32(32, 0);
+        assembler.CallIat("WriteFile_iat");
+    }
+
+    private static void EmitDelay(X64Assembler assembler)
+    {
+        assembler.XorReg32(AssemblerRegister.Rax, AssemblerRegister.Rax);
+        assembler.MovAlBytePtrReg(AssemblerRegister.Rbx);
+        assembler.MovRegReg(AssemblerRegister.Rcx, AssemblerRegister.Rax);
+        assembler.CallIat("Sleep_iat");
+    }
+
     private static void EmitErrorPath(X64Assembler assembler, string label, string messageLabel)
     {
         assembler.Label(label);
@@ -553,16 +649,9 @@ internal sealed class Win32X64PortableExecutableEmitter : IBinaryEmitter
         assembler.CallIat("ExitProcess_iat");
     }
 
-    private static int CountRepeatedTokens(string source, int start, char token)
-    {
-        int count = 0;
-        while (start + count < source.Length && source[start + count] == token)
-        {
-            count++;
-        }
+    private static string GetLoopStartLabel(int instructionIndex) => $"loop_start_{instructionIndex}";
 
-        return count;
-    }
+    private static string GetLoopEndLabel(int instructionIndex) => $"loop_end_{instructionIndex}";
 
     private static int GetMessageLength(string messageLabel) =>
         messageLabel switch
@@ -610,6 +699,11 @@ internal sealed class SectionBuilder
     public void WriteUInt64(ulong value)
     {
         _bytes.AddRange(BitConverter.GetBytes(value));
+    }
+
+    public void WriteBytes(ReadOnlySpan<byte> bytes)
+    {
+        _bytes.AddRange(bytes.ToArray());
     }
 
     public void WriteLabelReference32(string labelName)
@@ -682,7 +776,7 @@ internal static class PortableExecutableWriter32
         uint importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
         uint importDirectorySize = 40u;
         uint iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
-        uint iatSize = 20u;
+        uint iatSize = 24u;
         uint sizeOfImage = currentRva;
 
         textSection.Content = PatchTextSection(codeImage, fixedImportSection, dataSection, textSection.VirtualAddress, importPeSection.VirtualAddress, dataPeSection.VirtualAddress);
@@ -911,7 +1005,7 @@ internal static class PortableExecutableWriter
         uint importDescriptorRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["import_descriptor"];
         uint importDirectorySize = 40u;
         uint iatRva = importPeSection.VirtualAddress + (uint)fixedImportSection.Labels["GetStdHandle_iat"];
-        uint iatSize = 40u;
+        uint iatSize = 48u;
         uint sizeOfImage = currentRva;
 
         textSection.Content = PatchTextSection(codeImage, fixedImportSection, dataSection, textSection.VirtualAddress, importPeSection.VirtualAddress, dataPeSection.VirtualAddress);
@@ -1209,6 +1303,11 @@ internal sealed class X86Assembler
         EmitBytes(0x89, BuildModRm(0b11, (int)source, (int)destination));
     }
 
+    public void XorRegReg(X86Register destination, X86Register source)
+    {
+        EmitBytes(0x31, BuildModRm(0b11, (int)source, (int)destination));
+    }
+
     public void MovRegDwordPtrLabel(X86Register destination, string labelName)
     {
         EmitBytes(0x8B, BuildModRm(0b00, (int)destination, 0b101));
@@ -1240,6 +1339,11 @@ internal sealed class X86Assembler
         EmitInt32(value);
     }
 
+    public void AddRegReg(X86Register destination, X86Register source)
+    {
+        EmitBytes(0x01, BuildModRm(0b11, (int)source, (int)destination));
+    }
+
     public void SubReg32Immediate(X86Register register, int value)
     {
         EmitBytes(0x81, BuildModRm(0b11, 5, (int)register));
@@ -1269,6 +1373,21 @@ internal sealed class X86Assembler
     public void CmpBytePtrEbxImmediate(byte value) => EmitBytes(0x80, 0x3B, value);
 
     public void TestEaxEax() => EmitBytes(0x85, 0xC0);
+
+    public void ShiftLeftRegImmediate(X86Register register, byte value)
+    {
+        EmitBytes(0xC1, BuildModRm(0b11, 4, (int)register), value);
+    }
+
+    public void MovAlBytePtrReg(X86Register register)
+    {
+        EmitBytes(0x8A, BuildModRm(0b00, 0, (int)register));
+    }
+
+    public void MovBytePtrRegAl(X86Register register)
+    {
+        EmitBytes(0x88, BuildModRm(0b00, 0, (int)register));
+    }
 
     public void Int80() => EmitBytes(0xCD, 0x80);
 
@@ -1394,6 +1513,12 @@ internal sealed class X64Assembler
 
     public void CmpBytePtrRbxImmediate(byte value) => EmitBytes(0x80, 0x3B, value);
 
+    public void AddReg32Reg32(AssemblerRegister destination, AssemblerRegister source)
+    {
+        EmitRex(false, ((int)source & 8) != 0, false, ((int)destination & 8) != 0);
+        EmitBytes(0x01, BuildModRm(0b11, (int)source & 7, (int)destination & 7));
+    }
+
     public void MovStackQwordImmediate32(byte stackOffset, int value)
     {
         EmitBytes(0x48, 0xC7, 0x44, 0x24, stackOffset);
@@ -1401,6 +1526,24 @@ internal sealed class X64Assembler
     }
 
     public void TestEaxEax() => EmitBytes(0x85, 0xC0);
+
+    public void ShiftLeftReg32Immediate(AssemblerRegister register, byte value)
+    {
+        EmitRex(false, false, false, ((int)register & 8) != 0);
+        EmitBytes(0xC1, BuildModRm(0b11, 4, (int)register & 7), value);
+    }
+
+    public void MovAlBytePtrReg(AssemblerRegister register)
+    {
+        EmitRex(false, false, false, ((int)register & 8) != 0);
+        EmitBytes(0x8A, BuildModRm(0b00, 0, (int)register & 7));
+    }
+
+    public void MovBytePtrRegAl(AssemblerRegister register)
+    {
+        EmitRex(false, false, false, ((int)register & 8) != 0);
+        EmitBytes(0x88, BuildModRm(0b00, 0, (int)register & 7));
+    }
 
     public void Syscall() => EmitBytes(0x0F, 0x05);
 

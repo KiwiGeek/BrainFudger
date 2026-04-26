@@ -16,6 +16,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
     private const nuint WindowStyleMaskResizable = 8;
     private const nuint BackingStoreBuffered = 2;
     private const nint ModalResponseOk = 1;
+    private const nint NsButtonTypeSwitch = 3;
 
     private static MacGuiApplication? s_current;
 
@@ -27,6 +28,7 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
     private nint _outputField;
     private nint _targetPopup;
     private nint _cellsField;
+    private nint _enableExtensionsButton;
     private nint _statusLabel;
     private nint _actionTarget;
     private bool _outputPathWasEdited;
@@ -135,10 +137,12 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         _cellsField = AddTextField(contentView, new NSRect(300, 126, 120, 28), editable: true);
         SetControlText(_cellsField, "30000");
 
-        AddButton(contentView, "Build", new NSRect(20, 70, 120, 34), "buildBinary:");
-        AddButton(contentView, "Run", new NSRect(156, 70, 120, 34), "runBinary:");
+        _enableExtensionsButton = AddCheckbox(contentView, "Enable all extension commands (?, !, ~)", new NSRect(20, 92, 360, 24));
 
-        _statusLabel = AddTextField(contentView, new NSRect(20, 20, 700, 28), editable: false, bordered: false, drawBackground: false);
+        AddButton(contentView, "Build", new NSRect(20, 50, 120, 34), "buildBinary:");
+        AddButton(contentView, "Run", new NSRect(156, 50, 120, 34), "runBinary:");
+
+        _statusLabel = AddTextField(contentView, new NSRect(20, 14, 700, 28), editable: false, bordered: false, drawBackground: false);
         SetControlText(_statusLabel, "Choose a source file, target, and output path.");
 
         RefreshDerivedOutputPath(force: true);
@@ -259,7 +263,10 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
                 run,
                 quietRun: false,
                 cells,
-                targetId);
+                targetId,
+                IsButtonChecked(_enableExtensionsButton),
+                IsButtonChecked(_enableExtensionsButton),
+                IsButtonChecked(_enableExtensionsButton));
 
             PreparedCompilation prepared = CompilationWorkflow.PrepareAsync(options).GetAwaiter().GetResult();
             CompilationExecutionResult result = CompilationWorkflow.PersistOrRunAsync(prepared).GetAwaiter().GetResult();
@@ -401,6 +408,19 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
         return button;
     }
 
+    private nint AddCheckbox(nint parent, string title, NSRect frame)
+    {
+        nint button = Cocoa.SendIntPtr(
+            Cocoa.SendIntPtr(Cocoa.GetClass("NSButton"), "alloc"),
+            "initWithFrame:",
+            frame);
+
+        Cocoa.SendVoid(button, "setButtonType:", NsButtonTypeSwitch);
+        Cocoa.SendVoid(button, "setTitle:", Cocoa.ToNSString(title));
+        Cocoa.SendVoid(parent, "addSubview:", button);
+        return button;
+    }
+
     private nint AddPopupButton(nint parent, NSRect frame, string actionSelector)
     {
         nint popup = Cocoa.SendIntPtr(
@@ -423,6 +443,11 @@ internal sealed class MacGuiApplication : IGuiApplicationHost
     private static string GetControlText(nint control)
     {
         return Cocoa.GetNSString(Cocoa.SendIntPtr(control, "stringValue"));
+    }
+
+    private static bool IsButtonChecked(nint button)
+    {
+        return Cocoa.SendInt(button, "state") != 0;
     }
 
     private static void ShowAlert(string title, string message, bool critical)

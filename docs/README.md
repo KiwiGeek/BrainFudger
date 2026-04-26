@@ -10,6 +10,7 @@ This folder has two jobs:
 ## Reading Order
 
 - [Brainf\$\#k Language](./brainf$*k-language.md): syntax, semantics, I/O, common idioms, and practical gotchas
+- [Intermediate Opcodes](./intermediate-opcodes.md): the compiler's shared lowered instruction stream
 - [Executable Fundamentals](./executable-fundamentals.md): the general mental model for turning bytes into runnable programs
 - [Linux ELF Executables](./linux-elf.md): syscall-only ELF targets for x86, x64, and ARM64
 - [PE32 for Win x86](./pe32-x86.md): 32-bit Windows executables

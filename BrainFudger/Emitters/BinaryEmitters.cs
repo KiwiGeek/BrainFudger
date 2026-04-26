@@ -9,7 +9,7 @@ public interface IBinaryEmitter
     string DisplayName { get; }
     string DefaultFileExtension { get; }
     IReadOnlyList<string> Aliases => [];
-    byte[] EmitBinary(string sanitizedSource, CompilerOptions options);
+    byte[] EmitBinary(IntermediateProgram program, CompilerOptions options);
     bool CanExecuteOnCurrentPlatform(out string reason);
     void PrepareFileForExecution(string outputPath) { }
 }
