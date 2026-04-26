@@ -8,6 +8,8 @@ internal static class GuiApplicationHostFactory
         return WindowsGuiApplication.Instance;
 #elif APPLEOSX
         return MacGuiApplication.Instance;
+#elif LINUX
+        return LinuxGuiApplication.Instance;
 #else
         return null;
 #endif

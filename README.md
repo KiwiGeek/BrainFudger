@@ -7,6 +7,7 @@ If you want the full hex-goblin tour, the new [docs index](./docs/README.md) wal
 - the CLI remains the default interactive surface
 - a native Win32 GUI host is compiled in on Windows
 - a native AppKit GUI host is compiled in on macOS
+- a native Linux desktop GUI workflow is compiled in on Linux hosts
 
 ## What it does
 
