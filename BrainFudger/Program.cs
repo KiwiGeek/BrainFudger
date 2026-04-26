@@ -253,6 +253,10 @@ internal static class Program
         options.AddRow("[yellow]<input>[/]", Branding.SourceFileDescription);
 #if WINDOWS
         options.AddRow("[grey](no arguments)[/]", "Launch the native GUI file picker instead of the CLI error panel.");
+#elif APPLEOSX
+        options.AddRow("[grey](no arguments)[/]", "Launch the native AppKit GUI instead of the CLI error panel.");
+#elif LINUX
+        options.AddRow("[grey](no arguments)[/]", "Launch the native Linux desktop GUI workflow instead of the CLI error panel.");
 #endif
         options.AddRow("[blue]-o[/], [blue]--output[/]", "Write the generated binary to this path.");
         options.AddRow("[green]--run[/]", "Build to an OS temp directory, execute it, then clean it up.");
@@ -372,8 +376,12 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine($"  <input>           {Branding.SourceFileDescription}");
-#if WINDOWS || APPLEOSX
+#if WINDOWS
         Console.WriteLine("  (no arguments)    Launch the native GUI file picker instead of the CLI error panel.");
+#elif APPLEOSX
+        Console.WriteLine("  (no arguments)    Launch the native AppKit GUI instead of the CLI error panel.");
+#elif LINUX
+        Console.WriteLine("  (no arguments)    Launch the native Linux desktop GUI workflow instead of the CLI error panel.");
 #endif
         Console.WriteLine("  -o, --output      Write the generated binary to this path.");
         Console.WriteLine("  --run             Build to an OS temp directory, execute it, then clean it up.");
