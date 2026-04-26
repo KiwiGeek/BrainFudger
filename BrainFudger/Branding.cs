@@ -7,10 +7,10 @@ namespace BrainFudger;
 internal static class Branding
 {
 #if IAMGARYPENN
-    public const string AppDisplayName = "BrainFucker";
-    public const string CommandName = "brainfucker";
-    public const string LanguageDisplayName = "Brainfuck";
-    public const string LowercaseLanguageDisplayName = "brainfuck";
+    public const string AppDisplayName = "\u0042\u0072\u0061\u0069\u006E\u0046\u0075\u0063\u006B\u0065\u0072";
+    public const string CommandName = "\u0062\u0072\u0061\u0069\u006E\u0066\u0075\u0063\u006B\u0065\u0072";
+    public const string LanguageDisplayName = "\u0042\u0072\u0061\u0069\u006E\u0066\u0075\u0063\u006B";
+    public const string LowercaseLanguageDisplayName = "\u0062\u0072\u0061\u0069\u006E\u0066\u0075\u0063\u006B";
 #elif ZEROCOOL
     public const string AppDisplayName = "BrainFux0r";
     public const string CommandName = "brainfux0r";
